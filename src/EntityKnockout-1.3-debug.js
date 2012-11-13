@@ -1,7 +1,7 @@
 /**
 * EntityKnockout framework
 * http://ianyates83.github.com/entity-knockout/
-* v1.3.11
+* v1.3.12
 **/
 
 // Class to represent a local repository of entities (view models)
@@ -16,14 +16,13 @@ function EntityRepository(modelName, options) {
 		throw new Error('Failed to locate model definition: ' + modelName + 'Model');
 	if (options == undefined)
 		options = {};
-	if (options.sorted == undefined)
+	if (!('sorted' in options))
 		options.sorted = true;
-	if (options.serviceName == undefined)
+	if (!('serviceName' in options))
 		options.serviceName = modelName;
-	if (options.localOnly == true)
-		_enabled = false;
 	
 	var self = this;
+	self.ModelName = function () { return modelName; };
 	self.Observable = ko.observableArray();
 	self.IsDirty = ko.observable(false);
 	self.IsBusy = ko.observable(false);
@@ -41,7 +40,7 @@ function EntityRepository(modelName, options) {
 
 	// Prevent this repository from calling the server
 	self.DisableServer = function () { _enabled = false; };
-	var _enabled = true;
+	var _enabled = (options.localOnly !== true);
 
 	// Path all Url* values are appended to
 	self.BaseUrl = _RepositoryServerUrl || '/';
@@ -303,7 +302,7 @@ function EntityRepository(modelName, options) {
 		_decorateModel(self, item, data);
 		if (data != undefined && data != null) {
 			item.Update(data);
-			if (_getKey(data).replace(/^\|*/, "").replace(/\|*$/, "").length == 0) {
+			if (_getKey(data).match(/^\|*$/)) {
 				item.IsNew(true);
 				item.IsDirty(true);
 			}
@@ -571,15 +570,15 @@ function EntityRepository(modelName, options) {
 		options = options || {};
 		var saved = function (response) {
 			var data = $.parseJSON(response);
-			if (item.IsNew()) {
-				// New item saved
+			var newKey = _getKey(data);
+			if (item.dbKey != newKey) {
 				self.Observable.valueWillMutate();
 				_removeFromCache(item.dbKey); // Remove old key
 				_fillModelKey(item, data);
 				_addToCache(item);
 				self.Observable.valueHasMutated();
 			}
-			self.Attach(data);
+			item.Update(data);
 			if ($.isFunction(item.AfterSave))
 				item.AfterSave(true);
 			if ('callback' in options && $.isFunction(options.callback))
