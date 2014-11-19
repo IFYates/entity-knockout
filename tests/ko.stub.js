@@ -1,3 +1,14 @@
+if (!Array.prototype.indexOf) {
+	Array.prototype.indexOf = function (val) {
+		for (var i = 0; i < this.length; ++i) {
+			if (this[i] === val) {
+				return i;
+			}
+		}
+		return -1;
+	};
+}
+
 window.ko = (function () {
 	var _capturing = false, _stack = [];
 	return {
@@ -100,12 +111,7 @@ window.ko = (function () {
 				// TODO
 			};
 			api.indexOf = function (val) {
-				for (var i = 0; i < _value.length; ++i) {
-					if (_value[i] === val) {
-						return i;
-					}
-				}
-				return -1;
+				return _value.indexOf(val);
 			};
 			return api;
 		}
