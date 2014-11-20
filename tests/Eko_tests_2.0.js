@@ -59,6 +59,10 @@ describe('Eko namespace', function () {
 });
 
 describe('Repository factory', function () {
+	beforeEach(function () {
+		window.AnonModel = undefined;
+	});
+	
 	it('returns null before first create', function () {
 		var repo = eko.repositories.get('Anon');
 		expect(repo).toBeNull();
@@ -86,10 +90,6 @@ describe('Repository creation options', function () {
 			self.Fields = [ 'name', 'score' ];
 		};
 	});
-	afterEach(function () {
-		window.UserModel = undefined;
-		eko.repositories.clear();
-	});
 	
 	it('allows for moving data server location for Get', function () {
 		var ajaxOptions = null;
@@ -99,11 +99,11 @@ describe('Repository creation options', function () {
 		
 		var repo = eko.repositories.create('User', {
 			action: {
-				baseUrl: 'http://localhost/'
+				baseUrl: 'http://host1/'
 			}
 		});
 		repo.Get('1');
-		expect(ajaxOptions.url).toEqual('http://localhost/User/Get');
+		expect(ajaxOptions.url).toEqual('http://host1/User/Get');
 	});
 	
 	it('allows for renaming data controller for Get', function () {
@@ -114,12 +114,12 @@ describe('Repository creation options', function () {
 		
 		var repo = eko.repositories.create('User', {
 			action: {
-				baseUrl: 'http://localhost/',
+				baseUrl: 'http://host2/',
 				serviceName: 'Data'
 			}
 		});
 		repo.Get('1');
-		expect(ajaxOptions.url).toEqual('http://localhost/Data/Get');
+		expect(ajaxOptions.url).toEqual('http://host2/Data/Get');
 	});
 	
 	it('allows for renaming Get action', function () {
@@ -130,12 +130,12 @@ describe('Repository creation options', function () {
 		
 		var repo = eko.repositories.create('User', {
 			action: {
-				baseUrl: 'http://localhost/',
+				baseUrl: 'http://host3/',
 				Get: 'Fetch'
 			}
 		});
 		repo.Get('1');
-		expect(ajaxOptions.url).toEqual('http://localhost/User/Fetch');
+		expect(ajaxOptions.url).toEqual('http://host3/User/Fetch');
 	});
 	
 	it('allows for moving data server location for GetAll', function () {
@@ -146,11 +146,11 @@ describe('Repository creation options', function () {
 		
 		var repo = eko.repositories.create('User', {
 			action: {
-				baseUrl: 'http://localhost/'
+				baseUrl: 'http://host4/'
 			}
 		});
 		repo.GetAll();
-		expect(ajaxOptions.url).toEqual('http://localhost/User/GetAll');
+		expect(ajaxOptions.url).toEqual('http://host4/User/GetAll');
 	});
 	
 	it('allows for renaming data controller for GetAll', function () {
@@ -161,12 +161,12 @@ describe('Repository creation options', function () {
 		
 		var repo = eko.repositories.create('User', {
 			action: {
-				baseUrl: 'http://localhost/',
+				baseUrl: 'http://host5/',
 				serviceName: 'Data'
 			}
 		});
 		repo.GetAll();
-		expect(ajaxOptions.url).toEqual('http://localhost/Data/GetAll');
+		expect(ajaxOptions.url).toEqual('http://host5/Data/GetAll');
 	});
 	
 	it('allows for renaming GetAll action', function () {
@@ -177,22 +177,22 @@ describe('Repository creation options', function () {
 		
 		var repo = eko.repositories.create('User', {
 			action: {
-				baseUrl: 'http://localhost/',
+				baseUrl: 'http://host6/',
 				GetAll: 'FetchAll'
 			}
 		});
 		repo.GetAll();
-		expect(ajaxOptions.url).toEqual('http://localhost/User/FetchAll');
+		expect(ajaxOptions.url).toEqual('http://host6/User/FetchAll');
 	});
 
 	it('allows for moving data server location for Save', function () {
 		var repo = eko.repositories.create('User', {
 			action: {
-				baseUrl: 'http://localhost/'
+				baseUrl: 'http://host7/'
 			}
 		});
 		eko.utils.ajax = function (options) {
-			expect(options.url).toEqual('http://localhost/User/Save');
+			expect(options.url).toEqual('http://host7/User/Save');
 			options.success('{"id":1}');
 		};
 		var inst = repo.CreateNew({ name: 'test' });
@@ -202,12 +202,12 @@ describe('Repository creation options', function () {
 	it('allows for renaming data controller for Save', function () {
 		var repo = eko.repositories.create('User', {
 			action: {
-				baseUrl: 'http://localhost/',
+				baseUrl: 'http://host8/',
 				serviceName: 'Fake'
 			}
 		});
 		eko.utils.ajax = function (options) {
-			expect(options.url).toEqual('http://localhost/Fake/Save');
+			expect(options.url).toEqual('http://host8/Fake/Save');
 			options.success('{"id":1}');
 		};
 		var inst = repo.CreateNew({ name: 'test' });
@@ -217,12 +217,12 @@ describe('Repository creation options', function () {
 	it('allows for renaming Save action', function () {
 		var repo = eko.repositories.create('User', {
 			action: {
-				baseUrl: 'http://localhost/',
+				baseUrl: 'http://host9/',
 				Save: 'Fake'
 			}
 		});
 		eko.utils.ajax = function (options) {
-			expect(options.url).toEqual('http://localhost/User/Fake');
+			expect(options.url).toEqual('http://host9/User/Fake');
 			options.success('{"id":1}');
 		};
 		var inst = repo.CreateNew({ name: 'test' });
@@ -238,10 +238,6 @@ describe('Global options', function () {
 			self.Fields = [ 'name', 'score' ];
 		};
 	});
-	afterEach(function () {
-		window.UserModel = undefined;
-		eko.repositories.clear();
-	});
 	
 	it('allows for moving data server location for Get', function () {
 		var ajaxOptions = null;
@@ -249,10 +245,10 @@ describe('Global options', function () {
 			ajaxOptions = options;
 		};
 		
-		eko.options.baseUrl = 'http://localhost/';
+		eko.options.baseUrl = 'http://host10/';
 		var repo = eko.repositories.create('User');
 		repo.Get('1');
-		expect(ajaxOptions.url).toEqual('http://localhost/User/Get');
+		expect(ajaxOptions.url).toEqual('http://host10/User/Get');
 	});
 	
 	it('allows for renaming Get action', function () {
@@ -261,11 +257,11 @@ describe('Global options', function () {
 			ajaxOptions = options;
 		};
 		
-		eko.options.baseUrl = 'http://localhost/';
+		eko.options.baseUrl = 'http://host11/';
 		eko.options.actionGet = 'Fetch';
 		var repo = eko.repositories.create('User');
 		repo.Get('1');
-		expect(ajaxOptions.url).toEqual('http://localhost/User/Fetch');
+		expect(ajaxOptions.url).toEqual('http://host11/User/Fetch');
 	});
 	
 	it('allows for moving data server location for GetAll', function () {
@@ -274,10 +270,10 @@ describe('Global options', function () {
 			ajaxOptions = options;
 		};
 		
-		eko.options.baseUrl = 'http://localhost/';
+		eko.options.baseUrl = 'http://host12/';
 		var repo = eko.repositories.create('User');
 		repo.GetAll();
-		expect(ajaxOptions.url).toEqual('http://localhost/User/GetAll');
+		expect(ajaxOptions.url).toEqual('http://host12/User/GetAll');
 	});
 	
 	it('allows for renaming GetAll action', function () {
@@ -286,18 +282,18 @@ describe('Global options', function () {
 			ajaxOptions = options;
 		};
 		
-		eko.options.baseUrl = 'http://localhost/';
+		eko.options.baseUrl = 'http://host13/';
 		eko.options.actionGetAll = 'FetchAll';
 		var repo = eko.repositories.create('User');
 		repo.GetAll();
-		expect(ajaxOptions.url).toEqual('http://localhost/User/FetchAll');
+		expect(ajaxOptions.url).toEqual('http://host13/User/FetchAll');
 	});
 
 	it('allows for moving data server location for Save', function () {
-		eko.options.baseUrl = 'http://localhost/';
+		eko.options.baseUrl = 'http://host14/';
 		var repo = eko.repositories.create('User');
 		eko.utils.ajax = function (options) {
-			expect(options.url).toEqual('http://localhost/User/Save');
+			expect(options.url).toEqual('http://host14/User/Save');
 			options.success('{"id":1}');
 		};
 		var inst = repo.CreateNew({ name: 'test' });
@@ -305,21 +301,128 @@ describe('Global options', function () {
 	});
 	
 	it('allows for renaming Save action', function () {
-		eko.options.baseUrl = 'http://localhost/';
+		eko.options.baseUrl = 'http://host15/';
 		eko.options.actionSave = 'Fake';
 		var repo = eko.repositories.create('User');
 		eko.utils.ajax = function (options) {
-			expect(options.url).toEqual('http://localhost/User/Fake');
+			expect(options.url).toEqual('http://host15/User/Fake');
 			options.success('{"id":1}');
 		};
 		var inst = repo.CreateNew({ name: 'test' });
 		inst.Save();
+		eko.options.baseUrl = null;
 	});
 });
 
 describe('Creating repository instance', function () {
-	afterEach(function () {
-		eko.repositories.clear();
+	beforeEach(function () {
+		window.UserModel = function () {
+			var self = this;
+			self.Keys = [ 'id' ];
+			self.Fields = [ 'name', 'score' ];
+		};
+		
+		window.AnonModel = undefined;
+	});
+	
+	it('builds to match defined model by full or partial name', function () {
+		var repo = eko.repositories.create('User');
+		var inst = repo.CreateNew();
+		expect(inst.constructor.prototype).toEqual(window.UserModel.prototype);
+		expect(inst.id).toBeDefined();
+		expect(inst.name).toBeDefined();
+		
+		repo = eko.repositories.create('UserModel');
+		inst = repo.CreateNew();
+		expect(inst.constructor.prototype).toEqual(window.UserModel.prototype);
+		expect(inst.id).toBeDefined();
+		expect(inst.name).toBeDefined();
+	});
+	
+	it('builds with supplied def by full or partial name', function () {
+		var repo = eko.repositories.create('User', {
+			Keys: [ 'id2' ],
+			Fields: [ 'name2', 'score2' ]
+		});
+		var inst = repo.CreateNew();
+		expect(inst.constructor.prototype).toEqual(window.UserModel.prototype);
+		expect(inst.id).not.toBeDefined();
+		expect(inst.name).not.toBeDefined();
+		expect(inst.id2).toBeDefined();
+		expect(inst.name2).toBeDefined();
+		
+		repo = eko.repositories.create('UserModel', {
+			Keys: [ 'id2' ],
+			Fields: [ 'name2', 'score2' ]
+		});
+		inst = repo.CreateNew();
+		expect(inst.constructor.prototype).toEqual(window.UserModel.prototype);
+		expect(inst.id).not.toBeDefined();
+		expect(inst.name).not.toBeDefined();
+		expect(inst.id2).toBeDefined();
+		expect(inst.name2).toBeDefined();
+	});
+	
+	it('builds with prototype def by full or partial name', function () {
+		window.UserModel.prototype.Keys = [ 'id3' ];
+		window.UserModel.prototype.Fields = [ 'name3', 'score3' ];
+		
+		var repo = eko.repositories.create('User');
+		var inst = repo.CreateNew();
+		expect(inst.constructor.prototype).toEqual(window.UserModel.prototype);
+		expect(inst.id).not.toBeDefined();
+		expect(inst.name).not.toBeDefined();
+		expect(inst.id3).toBeDefined();
+		expect(inst.name3).toBeDefined();
+		
+		repo = eko.repositories.create('UserModel');
+		inst = repo.CreateNew();
+		expect(inst.constructor.prototype).toEqual(window.UserModel.prototype);
+		expect(inst.id).not.toBeDefined();
+		expect(inst.name).not.toBeDefined();
+		expect(inst.id3).toBeDefined();
+		expect(inst.name3).toBeDefined();
+	});
+	
+	it('building to model requires instance', function () {
+		var created = false;
+		window.UserModel = function () {
+			var self = this;
+			self.Keys = [ 'id' ];
+			self.Fields = [ 'name', 'score' ];
+			created = true;
+		};
+		var repo = eko.repositories.create('User');
+		expect(created).toEqual(true);
+	});
+	
+	it('building to def does not require instance', function () {
+		var created = false;
+		window.UserModel = function () {
+			var self = this;
+			self.Keys = [ 'id' ];
+			self.Fields = [ 'name', 'score' ];
+			created = true;
+		};
+		var repo = eko.repositories.create('User', {
+			Keys: [ 'id' ],
+			Fields: [ 'name', 'score' ]
+		});
+		expect(created).toEqual(false);
+	});
+	
+	it('building to prototype does not require instance', function () {
+		var created = false;
+		window.UserModel = function () {
+			var self = this;
+			self.Keys = [ 'id' ];
+			self.Fields = [ 'name', 'score' ];
+			created = true;
+		};
+		window.UserModel.prototype.Keys = [ 'id' ];
+		window.UserModel.prototype.Fields = [ 'name', 'score' ];
+		var repo = eko.repositories.create('User');
+		expect(created).toEqual(false);
 	});
 	
 	it('fails without model name', function () {
@@ -1716,5 +1819,207 @@ describe('Related entities', function () {
 		expect(inst.membership()).toEqual(membship);
 		
 		window.MembershipModel = undefined;
+	});
+});
+
+describe('Repository custom methods', function () {
+	beforeEach(function () {
+		window.UserModel = function () {
+			var self = this;
+			self.Keys = [ 'id' ];
+			self.Fields = [ 'name', 'score' ];
+		};
+	});
+	
+	it('can be created on a repository definition', function () {
+		var repo = eko.repositories.create('User');
+		expect(typeof repo.define).toEqual('function');
+	});
+	
+	it('can be chained together', function () {
+		var repo = eko.repositories.create('User');
+		var resp = repo.define('Fake', [], function () { });
+		expect(resp).toEqual(repo);
+	});
+	
+	it('create a new repository function', function () {
+		var repo = eko.repositories.create('User');
+		expect(typeof repo.Test).toEqual('undefined');
+		repo.define('Test', [], function () { });
+		expect(typeof repo.Test).toEqual('function');
+	});
+	
+	it('call specified server method', function () {
+		var called = false;
+		eko.utils.ajax = function (options) {
+			expect(options.url).toEqual('/User/Test');
+			called = true;
+		};
+		
+		var repo = eko.repositories.create('User', { action: { baseUrl: '/' } });
+		repo.define('Test', [], function () { });
+		repo.Test();
+		expect(called).toEqual(true);
+	});
+	
+	it('call different server method', function () {
+		var called = false;
+		eko.utils.ajax = function (options) {
+			expect(options.url).toEqual('/User/Other');
+			called = true;
+		};
+		
+		var repo = eko.repositories.create('User', { action: { baseUrl: '/' } });
+		repo.define('Test', [], function () { }, { action: 'Other' });
+		repo.Test();
+		expect(called).toEqual(true);
+	});
+	
+	it('call server as synchronous GET by default', function () {
+		var called = false;
+		eko.utils.ajax = function (options) {
+			expect(options.post).toEqual(false);
+			expect(options.async).toEqual(false);
+			called = true;
+		};
+		
+		var repo = eko.repositories.create('User');
+		repo.define('Test', [], function () { });
+		repo.Test();
+		expect(called).toEqual(true);
+	});
+	
+	it('can call server as POST', function () {
+		var called = false;
+		eko.utils.ajax = function (options) {
+			expect(options.post).toEqual(true);
+			called = true;
+		};
+		
+		var repo = eko.repositories.create('User');
+		repo.define('Test', [], function () { }, { post: true });
+		repo.Test();
+		expect(called).toEqual(true);
+	});
+	
+	it('can call server asynchronously', function (done) {
+		var called = false;
+		eko.utils.ajax = function (options) {
+			expect(options.async).toEqual(true);
+			setTimeout(function () {
+				called = true;
+				done();
+			}, 0);
+		};
+		
+		var repo = eko.repositories.create('User');
+		repo.define('Test', [], function () { }, { async: true });
+		repo.Test();
+		expect(called).toEqual(false);
+	});
+	
+	it('provide result to handler', function (done) {
+		var called = false;
+		eko.utils.ajax = function (options) {
+			called = true;
+			options.success(true);
+		};
+		
+		var repo = eko.repositories.create('User');
+		repo.define('Test', [], function (result) {
+			expect(result).toEqual(true);
+			done();
+		});
+		repo.Test();
+		expect(called).toEqual(true);
+	});
+	
+	it('can provide result to handler asynchronously', function (done) {
+		var called = false;
+		eko.utils.ajax = function (options) {
+			expect(options.async).toEqual(true);
+			setTimeout(function () {
+				called = true;
+				options.success(1);
+			}, 0);
+		};
+		
+		var repo = eko.repositories.create('User');
+		repo.define('Test', [], function (success, result) {
+			expect(success).toEqual(true);
+			expect(result).toEqual(1);
+			done();
+		}, { async: true });
+		repo.Test();
+		expect(called).toEqual(false);
+	});
+	
+	it('can handle errors', function () {
+		var called = false;
+		eko.utils.ajax = function (options) {
+			called = true;
+			options.error(1);
+		};
+		
+		var repo = eko.repositories.create('User');
+		repo.define('Test', [], function (success, result) {
+			expect(success).toEqual(false);
+			expect(result).toEqual(1);
+		});
+		repo.Test();
+	});
+	
+	it('cannot overwrite internal functionality', function () {
+		disableError();
+		var repo = eko.repositories.create('User');
+		expect(function () {
+			repo.define('Attach', [], function () { });
+		}).toThrow();
+	});
+	
+	it('can overwrite existing server functionality', function () {
+		var repo = eko.repositories.create('User');
+		expect(function () {
+			repo.define('Get', [], function () { });
+		}).not.toThrow();
+	});
+	
+	it('can overwrite defined method', function () {
+		var repo = eko.repositories.create('User');
+		expect(function () {
+			repo.define('Get', [], function () { });
+			repo.define('Get', [], function () { });
+		}).not.toThrow();
+	});
+	
+	it('requires specified arguments', function () {
+		disableError();
+		var called = false;
+		eko.utils.ajax = function (options) {
+			called = true;
+		};
+		
+		var repo = eko.repositories.create('User');
+		repo.define('Test', [ 'one' ], function () { });
+		expect(function () {
+			repo.Test();
+		}).toThrow();
+		expect(called).toEqual(false);
+	});
+	
+	it('will send arguments', function () {
+		var called = false;
+		eko.utils.ajax = function (options) {
+			called = true;
+			expect(options.data).toEqual({ 'one': 1, 'two': 'a' });
+		};
+		
+		var repo = eko.repositories.create('User');
+		repo.define('Test', [ 'one', 'two' ], function (success, result) {
+			expect(success).toEqual(false);
+			expect(result).toEqual(1);
+		});
+		repo.Test(1, 'a');
+		expect(called).toEqual(true);
 	});
 });

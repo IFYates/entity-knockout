@@ -11,15 +11,15 @@ v2.0-RC1
 
 ## What is Eko?
 EntityKnockout provides a quick way to use RESTful web services behind Knockout models.
-By default, repositories assume that they are being fed by a web service that can provide a collection of entities of the same type, with the ability to save or delete each entity. This functionality is completely adjustable per repository.
+By default, repositories assume that they are being fed by a web service that can provide a collection of entities of the same type, with the ability to get and save each entity. This functionality is completely adjustable per repository.
 
 ## How does Eko work?
-Eko provides a simple framework for creating a client-side repository of entities (ViewModels) representing server-side data (Models). Entities are recognised as unique by the key data within them; if two entities with the same key attempt to co-exist, the first will be updated by the second.
+Eko provides a simple framework for creating a client-side repository of entities (ViewModels) representing server-side data (Models). Entities are recognised as unique by the key data (including composites) within them; if two entities with the same key attempt to co-exist, the first will be updated by the second.
 
-Following a standard lifecycle, the repository will perform a GetAll or LoadFromServer request to the web service in order to download that latest set of entity data. This data will be converted to Knockout objects and attached to the repository, using the entity keys as the unique identifiers. If the server sent two items of data with the same key, the second instance would be used to update the fields of the first.
+Following a standard lifecycle, the repository will perform a GetAll request to the web service in order to download that latest set of entity data. This data will be converted to observable Knockout objects and attached to the repository, using the entity keys as the unique identifiers. If the server sent two items of data with the same key, the second instance would be used to update the fields of the first.
 Subsequent calls to GetAll would update all existing entities and create new instances of any items with new keys.
 
-Alternatively, the repository can be used just to track items on an individual basis using the GetByKey or GetByKeyFromServer methods, without having to call GetAll first.
+Alternatively, the repository can be used just to track items on an individual basis using the GetByKey method, without having to call GetAll first.
 
 Every entity received through a repository will support standard Knockout events as new server data is received for that entity.
 
@@ -167,12 +167,12 @@ If specified, Eko will automatically invoke certain model methods at specified e
 ## Complex Arrays
 In order to fully support JSON arrays of complex types (i.e., arrays of entities), there are some methods that each model array field must override:
 
-	array(object)	get{fieldName}()
+	array(object)	OnGet{fieldName}()
 		Expected to return array of objects to serialise. If the items have a forJSON method, this will be used to flattern the array further.
 		Note that any functions included as items in the array will be resolved, including observables.
 		In general, this method isn't needed as observableArrays support direct forJSON calls.
 	
-	void	set{fieldName}(object_array)
+	void	OnSet{fieldName}(object_array)
 		Expects the model to handle any deserialisation of the raw, deserialised JSON array.
 		
 		Example:
@@ -182,23 +182,13 @@ In order to fully support JSON arrays of complex types (i.e., arrays of entities
 		};
 		This will process the deserialised JSON array, assuming that it contains valid Child entities, and attach them to the ChildRepository as well as the observableArray of this Parent entity.
 	
-	void	add{fieldName}(object)
-		Only called if set{fieldName} is not declared. Passed each item of the deserialised JSON array and expects the model to handle accordingly.
-		The array will be emptied before the first call to this method each time the entity is updated.
-		
-		Example:
-		Using the same example as above:
-		self.addChildren = function (item) {
-			self.Children.push(ChildRepository.Attach(item));
-		};
-
 ## Repository Configuration
 	bool localOnly (default: false)
 	string serviceName (default: modelName)
 	bool sorted (default: true)
 
-## Relationships (TODO)
-As of v1.4, Eko natively supports defining entity relationships.
+## Relationships
+Eko natively supports defining entity relationships.
 
 ko.computed eko.relationship(key, repository, options)
 	@key - Field or observable of a scalar key value, or array of key fields/observables (in same order as entity Keys definition)
@@ -214,7 +204,7 @@ ko.computed eko.relationship(key, repository, options)
 
 ## Examples
 
-### University (TODO: v1.4)
+### University
 ```
 function UniversityModel() {
 	var self = this;
@@ -222,10 +212,10 @@ function UniversityModel() {
 	self.UniversityId = 0;
 	self.Courses = ko.observableArray([]);
 	
-	self.AfterCreate = function () {
+	self.OnCreated = function () {
 		self.Courses.valueWillMutate();
 		
-		CourseRepository.GetAll({ callback: function () {
+		eko.repos.get('Course').GetAll({ callback: function () {
 			self.Courses(ko.arrayFilter(CourseRepository.Observable(), function (el, i) {
 				return (el.UniversityId() == self.UniversityId);
 			}));
@@ -234,16 +224,13 @@ function UniversityModel() {
 	}:
 }
 
-eko.factory('University', {
-	ServiceName: 'Universities',
-	RootUrl: '/',
+eko.repos.create('University', {
+	baseUrl: '/',
+	serviceName: 'Universities',
 	Keys: [ 'UniversityId' ],
 	Fields: [ 'Name', 'Location' ]
-}).define('Enroll', {
-	args: [ 'studentId', 'date' ],
-	handler: function (data, success, errors) {
-		// TODO
-	}
+}).define('Enroll', [ 'studentId', 'date' ], function (success, data) {
+	// TODO
 });
 
 function CourseModel() {
@@ -252,19 +239,13 @@ function CourseModel() {
 	self.UniversityId = ko.observable(0);
 	self.University = eko.relationship(self.UniversityId, eko.factory('University'));
 }
-var CourseRepository = new eko.repository('Course', {
+var CourseRepository = new eko.repos.create('Course', {
 	Keys: [ 'CourseId' ],
 	Fields: [ 'UniversityId', 'Title' ]
-}).define('Start', {
-	args: [ 'date' ],
-	handler: function (data, succes, errors) {
-		// TODO
-	}
-}).define('Finish', {
-	args: [ 'date' ],
-	handler: function (data, succes, errors) {
-		// TODO
-	}
+}).define('Start', [ 'date' ], function (success, data) {
+	// TODO
+}).define('Finish', [ 'date' ], function (data, succes, errors) {
+	// TODO
 });
 
 function StudentModel() {

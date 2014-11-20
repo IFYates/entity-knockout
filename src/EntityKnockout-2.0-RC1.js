@@ -234,7 +234,7 @@ var DefaultOptions = {
 		// Set duck type
 		proto.IsNew = ko.observable(true);
 		proto.IsDirty = ko.observable(true);
-		//proto.IsBusy = ko.observable(false); // Updating, Saving, Deleting
+		////proto.IsBusy = ko.observable(false); // Updating, Saving, Deleting
 		
 		// Create keys
 		for (var i = 0; i < def.keys.length; ++i) {
@@ -250,13 +250,13 @@ var DefaultOptions = {
 				proto[field] = ko.observable();
 			}
 			if (_isFunc(proto[field])) {
-				//item[field].model = item;
-				//item[field].fieldName = field;
-				//item[field].IsDirty = ko.observable(false); // TODO: review
-				//item[field].subscribe(function() {
-				//	item.IsDirty(true);
-				//	item[field].IsDirty(true);
-				//});
+				////item[field].model = item;
+				////item[field].fieldName = field;
+				////item[field].IsDirty = ko.observable(false); // TODO: review
+				////item[field].subscribe(function() {
+				////	item.IsDirty(true);
+				////	item[field].IsDirty(true);
+				////});
 			}
 		}
 		
@@ -266,7 +266,7 @@ var DefaultOptions = {
 		};
 		proto.Update = function (data) {
 			var inst = this;
-			//inst.IsBusy(true);
+			////inst.IsBusy(true);
 			if (_isFunc(inst.OnUpdating)) {
 				inst.OnUpdating(data);
 			}
@@ -288,7 +288,7 @@ var DefaultOptions = {
 
 			inst.IsNew(false);
 			inst.IsDirty(false);
-			//inst.IsBusy(false);
+			////inst.IsBusy(false);
 			if (_isFunc(inst.OnUpdated)) {
 				inst.OnUpdated();
 			}
@@ -407,9 +407,9 @@ var DefaultOptions = {
 			}
 			if (!(key in _cache)) {
 				_cache[key] = inst;
-				//inst.IsDirty.subscribe(_updateIsDirty);
+				////inst.IsDirty.subscribe(_updateIsDirty);
 				if (inst.IsDirty() || inst.IsNew()) {
-					//_updateIsDirty();
+					////_updateIsDirty();
 				}
 			}
 			if (repo.Content().indexOf(inst) === -1) {
@@ -428,7 +428,7 @@ var DefaultOptions = {
 				var items = repo.Content();
 				for (var i = 0; i < items; ++i) {
 					if (items[i] === _cache[key]) {
-						//_explicitlyRemoveSubscribers(item);
+						////_explicitlyRemoveSubscribers(item);
 						repo.Content().splice(i, 1);
 						break;
 					}
@@ -452,7 +452,7 @@ var DefaultOptions = {
 		};
 		
 		self.RemoveSubscribers = function (model) {
-			//_explicitlyRemoveSubscribers(model);
+			////_explicitlyRemoveSubscribers(model);
 		};
 		
 		/***
@@ -607,6 +607,7 @@ var DefaultOptions = {
 			}
 			return item;
 		};
+		repo.Get.isCaller = true;
 		
 		// @options is a dictionary of:
 		//    async (bool), defaults false - execute asynchronously (return value is useless; set 'callback' if needed)
@@ -614,7 +615,7 @@ var DefaultOptions = {
 		//    params (dictionary) - key-value pairs to send as GET parameters
 		repo.GetAll = function (options) {
 			options = options || {};
-			//self.IsBusy(true);
+			////self.IsBusy(true);
 			eko.utils.ajax({
 				url: '' + repo.action.baseUrl + repo.action.serviceName + '/' + repo.action.GetAll,
 				async: !!options.async,
@@ -646,15 +647,15 @@ var DefaultOptions = {
 								_removeFromCache(key);
 							}
 							
-							//if (options.sorted) {
-							//	repo.Content().sort();
-							//}
+							////if (options.sorted) {
+							////	repo.Content().sort();
+							////}
 							repo.Content.valueHasMutated();
 							
 							if (_isFunc(options.result)) {
 								options.result(true);
 							}
-							//repo.IsBusy(false);
+							////repo.IsBusy(false);
 						} else {
 							setTimeout(work, 0);
 						}
@@ -674,6 +675,7 @@ var DefaultOptions = {
 			});
 			return repo.Content();
 		};
+		repo.GetAll.isCaller = true;
 		
 		// @options is a dictionary of:
 		//    async (bool), defaults true - execute asynchronously
@@ -686,7 +688,7 @@ var DefaultOptions = {
 				}
 			}
 			
-			//inst.IsBusy(true);
+			////inst.IsBusy(true);
 			options = options || {};
 			var params = (options.params || {});
 			params.item = inst.toJSON();
@@ -721,7 +723,7 @@ var DefaultOptions = {
 					if (_isFunc(options.result)) {
 						options.result(true);
 					}
-					//inst.IsBusy(false);
+					////inst.IsBusy(false);
 				},
 				error: function (xhr) {
 					inst.handleError(xhr); // TODO
@@ -731,9 +733,53 @@ var DefaultOptions = {
 					if (_isFunc(options.result)) {
 						options.result(false);
 					}
-					//inst.IsBusy(false);
+					////inst.IsBusy(false);
 				}
 			});
+		};
+		repo.SaveToServer.isCaller = true;
+		
+		/**
+		 * @param {String} name
+		 * @param {Array} args
+		 * @param {Function} handler
+		 * @param {Object} [options]
+		 * @param {String} [options.action]
+		 * @param {Boolean} [options.async]
+		 * @param {Boolean} [options.post]
+		 */
+		repo.define = function (name, args, handler, options) {
+			if (name in repo && (!_isFunc(repo[name]) || !repo[name].isCaller)) {
+				log.ERROR('define', 'Cannot overwrite internal functionality: ' + name);
+			}
+			
+			options = options || {};
+			repo[name] = function () {
+				if (arguments.length !== args.length) {
+					log.ERROR(name, 'Number of supplied arguments does not match definition (' + args.length + ')', arguments)
+				}
+				
+				var params = {};
+				for (var i = 0; i < args.length; ++i) {
+					params[args[i]] = arguments[i];
+				}
+				
+				eko.utils.ajax({
+					url: '' + repo.action.baseUrl + repo.action.serviceName + '/' + (options.action || name),
+					post: !!options.post,
+					async: !!options.async,
+					data: params,
+					success: function (data) {
+						handler(true, data);
+					},
+					error: function (data) {
+						handler(false, data);
+					}
+				});
+			};
+			repo[name].isCaller = true;
+			
+			return repo;
 		};
 	};
 	
@@ -778,7 +824,7 @@ var DefaultOptions = {
 			
 			// Ensure model exists correctly
 			var modelType = modelName;
-			if (!_isFunc(window[modelType]) && _isFunc(window[modelType + 'Model'])) {
+			if (!_isFunc(window[modelType])) {
 				modelType += 'Model';
 			}
 			if (!_isFunc(window[modelType])) {
@@ -789,12 +835,17 @@ var DefaultOptions = {
 				}
 			}
 			
-			var item = new window[modelType]();
-			var keys = item.Keys || def.Keys;
+			var keys = def.Keys || window[modelType].prototype.Keys;
+			var fields = def.Fields || window[modelType].prototype.Fields;
+			if (!keys || !fields) {
+				// Use instance to get for Keys/Fields
+				var item = new window[modelType]();
+				keys = keys || item.Keys;
+				fields = fields || item.Fields;
+			}
 			if (!keys || !keys.length) {
 				log.ERROR('create', 'Failed to locate model keys: ' + modelName);
 			}
-			var fields = item.Fields || def.Fields;
 			if (!fields || !_isArray(fields)) {
 				log.ERROR('create', 'Failed to locate model fields: ' + modelName);
 			}
