@@ -17,23 +17,27 @@ window.ko = (function () {
 			var _subs = [], _subd = [];
 			var subr = function () {
 				_latest = false;
-				api.valueWillMutate();
-				api.valueHasMutated();
+				valueWillMutate();
+				valueHasMutated();
+			};
+			
+			function valueWillMutate() {
+				++_suspend;
+			};
+			function valueHasMutated() {
+				if (_suspend > 0 && --_suspend === 0) {
+					for (var i = 0; i < _subs.length; ++i) {
+						_subs[i](_value);
+					}
+				}
 			};
 			
 			var api = function () {
-				if (arguments.length > 0) {
-					if (typeof options.write !== 'function') {
-						throw new Error('Computed cannot be written to without "write" function.');
-					}
-					options.write(arguments[0]);
-					return;
-				}
 				if (_capturing && _stack.indexOf(api) < 0) {
 					_stack.push(api);
 				}
 				if (_value === undefined || !_latest) {
-					api.valueWillMutate();
+					valueWillMutate();
 					for (var i = 0; i < _subd.length; ++i) {
 						_subd[i].unsubscribe(subr);
 					}
@@ -50,7 +54,7 @@ window.ko = (function () {
 					for (var i = 0; i < _subd.length; ++i) {
 						_subd[i].subscribe(subr);
 					}
-					api.valueHasMutated();
+					valueHasMutated();
 				}
 				return _value;
 			};
@@ -63,16 +67,6 @@ window.ko = (function () {
 			api.unsubscribe = function (fn) {
 				if ((i = _subs.indexOf(fn)) >= 0) {
 					_subs.splice(i, 1);
-				}
-			};
-			api.valueWillMutate = function () {
-				++_suspend;
-			};
-			api.valueHasMutated = function () {
-				if (_suspend > 0 && --_suspend === 0) {
-					for (var i = 0; i < _subs.length; ++i) {
-						_subs[i](_value);
-					}
 				}
 			};
 			return api;

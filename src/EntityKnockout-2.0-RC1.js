@@ -134,9 +134,9 @@ var DefaultOptions = {
 		},
 		
 		/**
-		 * @param {Object} [options=null] Options to use when getting the related entity (see Repository.Get)
+		 * @param {Object} [options] Options to use when getting the related entity (see Repository.Get)
 		 */
-		entity: function (keys, repository, options) {
+		relationship: function (keys, repository, options) {
 			var _repo = null;
 			options = options || {};
 			options.async = false;
@@ -150,7 +150,7 @@ var DefaultOptions = {
 							_repo = repository;
 						}
 						if (!_repo) {
-							log.ERROR('entity', 'Unknown repository for relationship: ' + repository);
+							log.ERROR('relationship', 'Unknown repository for relationship: ' + repository);
 						}
 					}
 					
@@ -169,50 +169,6 @@ var DefaultOptions = {
 					return _repo.Get(key, options);
 				}
 			})
-		},
-
-		/**
-		 * @param {String|Repository} repository
-		 * @param {Object} [options=null]
-		 * @param {Boolean} [options.attach=true]
-		 */
-		entityArray: function (repository, options) {
-			var _repo = repository;
-			if (!repository || (typeof repository !== 'string' && repository.constructor.prototype !== eko.Repository.prototype)) {
-				log.ERROR('entityArray', 'Unknown argument value: repository', repository);
-			}
-			options = options || {};
-			options.attach = options.attach != false;
-			var _array = null;
-			var impl = ko.computed({
-				deferEvaluation: true,
-				read: function () {
-					return _array;
-				},
-				write: function (vals) {
-					impl.valueWillMutate();
-					impl.repository();
-					if (options.attach) {
-						_array = _repo.Attach(vals);
-					} else {
-						_array = [];
-						for (var i = 0; i < vals.length; ++i) {
-							_array.push(_repo.CreateNew(vals[i]));
-						}
-					}
-					impl.valueHasMutated();
-				}
-			});
-			impl.repository = function () {
-				if (typeof _repo === 'string') {
-					_repo = eko.repositories.get(repository);
-					if (!_repo) {
-						log.ERROR('entityArray', 'Unknown named repository: ' + repository);
-					}
-				}
-				return _repo;
-			};
-			return impl;
 		}
 	};
 	window.eko = eko;
