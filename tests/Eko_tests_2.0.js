@@ -1661,7 +1661,7 @@ describe('Related entities', function () {
 			self.Keys = [ 'id' ];
 			self.Fields = [ 'name', 'parentId' ];
 			
-			self.parent = eko.relationship(self.parentId, 'User');
+			self.parent = eko.entity(self.parentId, 'User');
 		};
 	});
 	
@@ -1675,7 +1675,7 @@ describe('Related entities', function () {
 	it('can be defined using target repository', function () {
 		var repo = eko.repositories.create('User');
 		var inst = repo.CreateNew({ id: 1, name: 'Child' });
-		inst.parent = eko.relationship(inst.parentId, repo);
+		inst.parent = eko.entity(inst.parentId, repo);
 		expect(typeof inst.parentId).toEqual('function');
 		expect(typeof inst.parent).toEqual('function');
 	});
@@ -1721,7 +1721,7 @@ describe('Related entities', function () {
 		window.UserModel.prototype.parentId = null;
 		var parent = repo.Attach({ id: 2, name: 'Parent' });
 		var inst = repo.CreateNew({ id: 1, name: 'Child', parentId: 2 });
-		inst.parent = eko.relationship(inst.parentId, 'User');
+		inst.parent = eko.entity(inst.parentId, 'User');
 		expect(inst.parent()).toEqual(parent);
 	});
 	
@@ -1740,7 +1740,7 @@ describe('Related entities', function () {
 		var parent1 = repo.Attach({ id: 2, name: 'Parent 1' });
 		var parent2 = repo.Attach({ id: 3, name: 'Parent 2' });
 		var inst = repo.CreateNew({ id: 1, name: 'Child', parentId: 2 });
-		inst.parent = eko.relationship(inst.parentId, 'User');
+		inst.parent = eko.entity(inst.parentId, 'User');
 		inst.parentId = 3;
 		expect(inst.parent()).toEqual(parent1);
 	});
@@ -1773,7 +1773,7 @@ describe('Related entities', function () {
 		var repo = eko.repositories.create('User');
 		var parent = repo.Attach({ id: 2, name: 'Parent' });
 		var inst = repo.CreateNew({ id: 1, name: 'Child', parentId: 2 });
-		inst.parent = eko.relationship(inst.parentId, 'User', { async: true });
+		inst.parent = eko.entity(inst.parentId, 'User', { async: true });
 		inst.parentId(3);
 		expect(inst.parent()).not.toBeTruthy();
 	});
@@ -1786,7 +1786,7 @@ describe('Related entities', function () {
 		var repo = eko.repositories.create('User');
 		var parent = repo.Attach({ id: 2, name: 'Parent' });
 		var inst = repo.CreateNew({ id: 1, name: 'Child', parentId: 2 });
-		inst.parent = eko.relationship(inst.parentId, 'User', { from: 'local' });
+		inst.parent = eko.entity(inst.parentId, 'User', { from: 'local' });
 		inst.parentId(3);
 		expect(inst.parent()).not.toBeTruthy();
 		expect(checked).toEqual(false);
@@ -1798,7 +1798,7 @@ describe('Related entities', function () {
 			self.Keys = [ 'userId', 'order' ];
 			self.Fields = [ 'title' ];
 			
-			self.parent = eko.relationship(self.parentId, 'User');
+			self.parent = eko.entity(self.parentId, 'User');
 		};
 		window.UserModel = function () {
 			var self = this;
@@ -1806,7 +1806,7 @@ describe('Related entities', function () {
 			self.Fields = [ 'name' ];
 			
 			self.id = ko.observable();
-			self.membership = eko.relationship([ self.id, 1 ], 'Membership');
+			self.membership = eko.entity([ self.id, 1 ], 'Membership');
 		};
 		
 		var repo1 = eko.repositories.create('Membership');
@@ -1820,6 +1820,53 @@ describe('Related entities', function () {
 		
 		window.MembershipModel = undefined;
 	});
+});
+
+describe('Entities arrays', function () {
+	beforeEach(function () {
+		window.UserModel = function () {
+			var self = this;
+			self.Keys = [ 'id' ];
+			self.Fields = [ 'name', 'children' ];
+		};
+	});
+	
+	it('can be defined with model name', function () {
+		window.UserModel.prototype.children = eko.entityArray('User');
+		var repo = eko.repositories.create('User');
+		var inst = repo.CreateNew();
+		expect(typeof inst.children).toEqual('function');
+		expect(inst.children.repository()).toEqual(repo);
+	});
+	
+	it('can be defined with repository', function () {
+		var repo = eko.repositories.create('User');
+		window.UserModel.prototype.children = eko.entityArray(repo);
+		var inst = repo.CreateNew();
+		expect(typeof inst.children).toEqual('function');
+		expect(inst.children.repository()).toEqual(repo);
+	});
+	
+	it('will attach received instances by default', function () {
+		window.UserModel.prototype.children = eko.entityArray('User');
+		var repo = eko.repositories.create('User');
+		var inst = repo.Attach({ id: 1 });
+		inst.children([{id:2}, {id:3}]);
+		expect(inst.children()).toBeTruthy();
+		expect(inst.children().length).toEqual(2);
+		expect(repo.Count()).toEqual(3);
+	});
+	
+	it('can be told to not attach received instances', function () {
+		window.UserModel.prototype.children = eko.entityArray('User', { attach: false });
+		var repo = eko.repositories.create('User');
+		var inst = repo.Attach({ id: 1 });
+		inst.children([{id:2}, {id:3}]);
+		expect(inst.children().length).toEqual(2);
+		expect(repo.Count()).toEqual(1);
+	});
+	
+	it('handle invalid array data');
 });
 
 describe('Repository custom methods', function () {
