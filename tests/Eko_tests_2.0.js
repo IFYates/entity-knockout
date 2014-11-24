@@ -1209,6 +1209,39 @@ describe('Fetch all entities', function () {
 		expect(result.length).toEqual(2);
 	});
 	
+	it('will throw error on bad server response after result call', function () {
+		eko.utils.ajax = function (options) {
+			options.error({ status: 500 });
+		};
+		var repo = eko.repositories.create('User');
+		var called = false;
+		expect(function () {
+			repo.GetAll({
+				result: function (success) {
+					called = true;
+					expect(success).toEqual(false);
+				}
+			});
+		}).toThrow();
+		expect(called).toEqual(true);
+	});
+	
+	it('can not throw error on bad server response after result call', function () {
+		eko.utils.ajax = function (options) {
+			options.error({ status: 500 });
+		};
+		var repo = eko.repositories.create('User');
+		var called = false;
+		repo.GetAll({
+			result: function (success) {
+				called = true;
+				expect(success).toEqual(false);
+				return true;
+			}
+		});
+		expect(called).toEqual(true);
+	});
+	
 	xit('is busy until ended', function () {
 		eko.utils.ajax = function (options) {
 			options.success('[{"id":1},{"id":2}]');

@@ -711,10 +711,12 @@ var DefaultOptions = {
 					}
 				},
 				error: function (xhr) {
-					log.ERROR('GetAll', def.name + ' server error: ' + xhr.status, xhr);
 					if (_isFunc(options.result)) {
-						options.result(false);
+						if (options.result(false) === true) {
+							return;
+						}
 					}
+					log.ERROR('GetAll', def.name + ' server error: ' + xhr.status, xhr);
 				}
 			});
 			return repo.Content();
