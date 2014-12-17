@@ -16,9 +16,9 @@ var DefaultOptions = {
 
 (function () {
 	var eko = this;
-	
+
 	/** Helper functions **/
-	
+
 	var log = (function () {
 		function _log(comp, lvl, msg, logfn, data) {
 			var message = '[eko:' + comp + '] ' + lvl + ': ' + msg;
@@ -50,7 +50,7 @@ var DefaultOptions = {
 			}
 		};
 	})();
-	
+
 	// Will match true arrays and ko.observableArray
 	function _isArray(obj) {
 		return obj && typeof obj === 'object' && _isFunc(obj.splice);
@@ -64,7 +64,7 @@ var DefaultOptions = {
 	function is(val) {
 		return val !== null && val !== undefined;
 	}
-	
+
 	function _unwrap(val) {
 		return (_isFunc(val) ? val() : val);
 	}
@@ -79,7 +79,7 @@ var DefaultOptions = {
 		}
 		return res;
 	}
-	
+
 	/** Main namespace **/
 	var eko = {
 		options: {
@@ -88,7 +88,7 @@ var DefaultOptions = {
 			actionGetAll: 'GetAll',
 			actionSave: 'Save'
 		},
-		
+
 		log: log,
 		utils: {
 			/**
@@ -102,7 +102,7 @@ var DefaultOptions = {
 			 */
 			ajax: function (options) { // Allows for override
 				var xhr = new XMLHttpRequest();
-				xhr.onreadystatechange = function() {
+				xhr.onreadystatechange = function () {
 					if (xhr.readyState === 4) {
 						if (xhr.status === 200 || xhr.status === 201) {
 							options.success(xhr.responseText);
@@ -111,19 +111,32 @@ var DefaultOptions = {
 						}
 					}
 				}
-				
-				// Cache-break for GET
-				if (!options.post) {
-					if (typeof options.data === 'string') {
-						options.data += '&_=' + Date.now();
-					} else {
-						options.data = options.data || {};
-						options.data._ = Date.now();
-					}
-				}
 
+				options.data = options.data || '';
+				if (typeof options.data !== 'string') {
+					var d = options.data, data = '';
+					for (var p in d) {
+						if (d.hasOwnProperty(p)) {
+							data += '&' + encodeURIComponent(p) + '=';
+							if (typeof d[p] === 'object') {
+								data += encodeURIComponent(JSON.stringify(d[p]));
+							} else {
+								data += encodeURIComponent(d[p]);
+							}
+						}
+					}
+					options.data = (data.length > 0 ? data.substring(1) : '');
+				}
+				
 				xhr.open(options.post ? 'POST' : 'GET', options.url, options.async != false);
 				xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+				
+				if (!options.post) {
+					options.data += '&_=' + Date.now(); // Cache-break for GET
+				} else {
+					xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+				}
+
 				xhr.send(options.data);
 			},
 			isArray: _isArray,
@@ -132,11 +145,11 @@ var DefaultOptions = {
 			isset: is,
 			unwrap: _unwrap
 		},
-		
+
 		/**
-		 * @param {Object} [options] Options to use when getting the related entity (see Repository.Get)
+		 * @param {Object} [options=null] Options to use when getting the related entity (see Repository.Get)
 		 */
-		relationship: function (keys, repository, options) {
+		entity: function (keys, repository, options) {
 			var _repo = null;
 			options = options || {};
 			options.async = false;
@@ -150,10 +163,10 @@ var DefaultOptions = {
 							_repo = repository;
 						}
 						if (!_repo) {
-							log.ERROR('relationship', 'Unknown repository for relationship: ' + repository);
+							log.ERROR('entity', 'Unknown repository for relationship: ' + repository);
 						}
 					}
-					
+
 					var key = '';
 					if (_isArray(keys)) {
 						for (var i = 0; i < keys.length; ++i) {
@@ -165,14 +178,58 @@ var DefaultOptions = {
 					} else {
 						key = _unwrap(keys);
 					}
-					
+
 					return _repo.Get(key, options);
 				}
 			})
+		},
+
+		/**
+		 * @param {String|Repository} repository
+		 * @param {Object} [options=null]
+		 * @param {Boolean} [options.attach=true]
+		 */
+		entityArray: function (repository, options) {
+			var _repo = repository;
+			if (!repository || (typeof repository !== 'string' && repository.constructor.prototype !== eko.Repository.prototype)) {
+				log.ERROR('entityArray', 'Unknown argument value: repository', repository);
+			}
+			options = options || {};
+			options.attach = options.attach != false;
+			var _array = null;
+			var impl = ko.computed({
+				deferEvaluation: true,
+				read: function () {
+					return _array;
+				},
+				write: function (vals) {
+					impl.valueWillMutate();
+					impl.repository();
+					if (options.attach) {
+						_array = _repo.Attach(vals);
+					} else {
+						_array = [];
+						for (var i = 0; i < vals.length; ++i) {
+							_array.push(_repo.CreateNew(vals[i]));
+						}
+					}
+					impl.valueHasMutated();
+				}
+			});
+			impl.repository = function () {
+				if (typeof _repo === 'string') {
+					_repo = eko.repositories.get(repository);
+					if (!_repo) {
+						log.ERROR('entityArray', 'Unknown named repository: ' + repository);
+					}
+				}
+				return _repo;
+			};
+			return impl;
 		}
 	};
 	window.eko = eko;
-	
+
 	// TODO: Currently for key; does this work for field?
 	function _setFieldValue(inst, field, val) {
 		// Resolve value
@@ -182,7 +239,7 @@ var DefaultOptions = {
 		if (_isFunc(val)) {
 			val = val();
 		}
-		
+
 		// Convert number from string
 		if (typeof val === 'string' && !isNaN(num = Number(val)) && val === num.toString()) {
 			val = num;
@@ -190,7 +247,7 @@ var DefaultOptions = {
 		if (_isArray(val)) {
 			val = val.slice();
 		}
-		
+
 		// Set value
 		if (inst[field] && _isFunc(inst[field].valueWillMutate)) {
 			inst[field].valueWillMutate();
@@ -206,14 +263,14 @@ var DefaultOptions = {
 			inst[field].valueHasMutated();
 		}
 	};
-	
+
 	// Decorate basic model with EKO functionality
 	// Online called on Create or first Attach
 	function _completeModelPrototype(def, proto) {
 		// Fixed values
 		proto.modelName = def.name;
 		proto.repository = null;
-		
+
 		// Overrides
 		if (_isFunc(def.overrides.OnCreated)) {
 			proto.OnCreated = def.overrides.OnCreated;
@@ -234,15 +291,15 @@ var DefaultOptions = {
 		// Set duck type
 		proto.IsNew = ko.observable(true);
 		proto.IsDirty = ko.observable(true);
-		//proto.IsBusy = ko.observable(false); // Updating, Saving, Deleting
-		
+		////proto.IsBusy = ko.observable(false); // Updating, Saving, Deleting
+
 		// Create keys
 		for (var i = 0; i < def.keys.length; ++i) {
 			if (!(field in proto)) {
 				proto[field] = null;
 			}
 		}
-		
+
 		// Create fields (TODO: defaults)
 		for (var i = 0; i < def.fields.length; ++i) {
 			var field = def.fields[i];
@@ -250,36 +307,36 @@ var DefaultOptions = {
 				proto[field] = ko.observable();
 			}
 			if (_isFunc(proto[field])) {
-				//item[field].model = item;
-				//item[field].fieldName = field;
-				//item[field].IsDirty = ko.observable(false); // TODO: review
-				//item[field].subscribe(function() {
-				//	item.IsDirty(true);
-				//	item[field].IsDirty(true);
-				//});
+				////item[field].model = item;
+				////item[field].fieldName = field;
+				////item[field].IsDirty = ko.observable(false); // TODO: review
+				////item[field].subscribe(function() {
+				////	item.IsDirty(true);
+				////	item[field].IsDirty(true);
+				////});
 			}
 		}
 		
+		proto.clone = function () {
+		    return this.repository.CreateNew(this.toPOJO());
+		};
+
 		// Default functionality
 		proto.Delete = function () {
 			// TODO?
 		};
 		proto.Update = function (data) {
 			var inst = this;
-			//inst.IsBusy(true);
+			////inst.IsBusy(true);
 			if (_isFunc(inst.OnUpdating)) {
 				inst.OnUpdating(data);
 			}
-			
+
 			for (var i = 0; i < def.fields.length; ++i) {
 				var field = def.fields[i];
 				if (field in data) {
 					var val = _unwrap(data[field]);
-					if (_isArray(inst[field]) && _isArray(val)) {
-						_setArray(inst, field, val);
-					} else {
-						_setFieldValue(inst, field, val);
-					}
+					_setFieldValue(inst, field, val);
 					if (inst[field] && _isFunc(inst[field].IsDirty)) {
 						inst[field].IsDirty(false);
 					}
@@ -288,7 +345,7 @@ var DefaultOptions = {
 
 			inst.IsNew(false);
 			inst.IsDirty(false);
-			//inst.IsBusy(false);
+			////inst.IsBusy(false);
 			if (_isFunc(inst.OnUpdated)) {
 				inst.OnUpdated();
 			}
@@ -297,7 +354,7 @@ var DefaultOptions = {
 		proto.Save = function (options) {
 			this.repository.SaveToServer(this, options);
 		};
-		
+
 		proto.toPOJO = function () {
 			var obj = {};
 			for (var i = 0; i < def.keys.length; ++i) {
@@ -316,7 +373,7 @@ var DefaultOptions = {
 						} else {
 							val = _unwrap(this[field]);
 						}
-						
+
 						// Convert to POJO
 						for (var i = 0; i < val.length; ++i) {
 							if (typeof val[i] === 'object') {
@@ -339,11 +396,11 @@ var DefaultOptions = {
 						obj[field] = val;
 					}
 				}
-	        }
-	        if (_unwrap(this.IsNew)) {
+			}
+			if (_unwrap(this.IsNew)) {
 				obj.IsNew = true;
-	        } else if (_unwrap(this.IsDirty)) {
-	            obj.IsDirty = true;
+			} else if (_unwrap(this.IsDirty)) {
+				obj.IsDirty = true;
 			}
 			return obj;
 		};
@@ -351,14 +408,14 @@ var DefaultOptions = {
 			return JSON.stringify(this.toPOJO());
 		};
 	};
-	
+
 	/** Repository definition **/
 	eko.Repository = function (def, constr) {
 		_completeModelPrototype(def, constr.prototype);
-		
+
 		var repo = this;
 		var _cache = {};
-		
+
 		// TODO: Improve
 		repo.action = {
 			baseUrl: def.action.baseUrl || eko.options.baseUrl || (function () {
@@ -371,11 +428,11 @@ var DefaultOptions = {
 			GetAll: def.action.GetAll || eko.options.actionGetAll,
 			Save: def.action.Save || eko.options.actionSave
 		};
-		
+
 		repo.ModelName = function () { return def.name; };
 		repo.Content = ko.observableArray([]);
 		repo.Count = function () { return repo.Content().length; };
-		
+
 		// Get the model key from the raw data or item
 		function _getKey(data) {
 			var str = '';
@@ -390,7 +447,7 @@ var DefaultOptions = {
 			}
 			return str;
 		};
-		
+
 		// Set the value of the model key, based on data
 		function _fillModelKey(item, data) {
 			item.repository = repo;
@@ -399,7 +456,7 @@ var DefaultOptions = {
 			}
 			item.dbKey = _getKey(item);
 		};
-		
+
 		function _addToCache(inst) {
 			var key = 'I' + inst.dbKey;
 			if (key in _cache && _cache[key] !== inst) {
@@ -407,28 +464,28 @@ var DefaultOptions = {
 			}
 			if (!(key in _cache)) {
 				_cache[key] = inst;
-				//inst.IsDirty.subscribe(_updateIsDirty);
+				////inst.IsDirty.subscribe(_updateIsDirty);
 				if (inst.IsDirty() || inst.IsNew()) {
-					//_updateIsDirty();
+					////_updateIsDirty();
 				}
 			}
 			if (repo.Content().indexOf(inst) === -1) {
 				repo.Content().push(inst);
 			}
 		}
-		
+
 		/**
 		 * Silently removes an item from the cache
 		 */
 		function _removeFromCache(key) {
-			if ((''+key)[0] !== 'I') {
+			if (('' + key)[0] !== 'I') {
 				key = 'I' + key;
 			}
 			if (key in _cache) {
 				var items = repo.Content();
 				for (var i = 0; i < items; ++i) {
 					if (items[i] === _cache[key]) {
-						//_explicitlyRemoveSubscribers(item);
+						////_explicitlyRemoveSubscribers(item);
 						repo.Content().splice(i, 1);
 						break;
 					}
@@ -438,7 +495,7 @@ var DefaultOptions = {
 				delete _cache[key];
 			}
 		}
-		
+
 		// Clear all values from this repository
 		repo.Clear = function () {
 			repo.Content.valueWillMutate();
@@ -450,11 +507,11 @@ var DefaultOptions = {
 			repo.Content.valueHasMutated();
 			_cache = {};
 		};
-		
+
 		self.RemoveSubscribers = function (model) {
-			//_explicitlyRemoveSubscribers(model);
+			////_explicitlyRemoveSubscribers(model);
 		};
-		
+
 		/***
 		@item: JSON string, POJO, array of POJOs, valid entity, array of valid entities
 		***/
@@ -489,9 +546,9 @@ var DefaultOptions = {
 				if (key.length === 1) {
 					log.ERROR('Attach', 'Cannot attach incomplete item to ' + def.name, item);
 				}
-				
+
 				var wasNew = ('IsNew' in item ? !!_unwrap(item.IsNew) : false);
-				
+
 				// If already exists, just an update
 				if (key in _cache) {
 					_cache[key].Update(item);
@@ -500,17 +557,17 @@ var DefaultOptions = {
 					if (item.prototype !== constr.prototype) {
 						item = repo.CreateNew(item);
 					}
-					
+
 					// Guess that entity is new
 					if (!item.dbKey || key !== 'I' + item.dbKey) {
 						key = 'I' + item.dbKey;
 						wasNew = true;
 					}
-					
+
 					// Attach if missing
 					_addToCache(item);
 				}
-				
+
 				_cache[key].IsNew(wasNew);
 				_cache[key].IsDirty(wasNew);
 				return _cache[key];
@@ -538,7 +595,7 @@ var DefaultOptions = {
 			}
 			return inst;
 		};
-		
+
 		repo.Detach = function (inst) {
 			if (inst && 'I' + inst.dbKey in _cache) {
 				repo.Content.valueWillMutate();
@@ -546,7 +603,7 @@ var DefaultOptions = {
 				repo.Content.valueHasMutated();
 			}
 		};
-		
+
 		/**
 		 * Checks locally or remotely for a single item matching the given key.
 		 * @param {Object} options
@@ -561,11 +618,11 @@ var DefaultOptions = {
 			}
 			options = options || {};
 			options.from = options.from || 'default';
-			
+
 			// Check locally
 			var item = null;
 			if (options.from === 'default' || options.from === 'local') {
-				if ('I'+key in _cache) {
+				if ('I' + key in _cache) {
 					item = _cache['I' + key];
 				}
 			}
@@ -587,7 +644,7 @@ var DefaultOptions = {
 						if (_isArray(data)) {
 							log.ERROR('Get', def.name + '.' + key + ' returned array', data);
 						}
-						
+
 						repo.Content.valueWillMutate();
 						item = repo.Attach(data);
 						repo.Content.valueHasMutated();
@@ -607,14 +664,15 @@ var DefaultOptions = {
 			}
 			return item;
 		};
-		
+		repo.Get.isCaller = true;
+
 		// @options is a dictionary of:
 		//    async (bool), defaults false - execute asynchronously (return value is useless; set 'callback' if needed)
 		//    result (function) - called with bool of success
 		//    params (dictionary) - key-value pairs to send as GET parameters
 		repo.GetAll = function (options) {
 			options = options || {};
-			//self.IsBusy(true);
+			////self.IsBusy(true);
 			eko.utils.ajax({
 				url: '' + repo.action.baseUrl + repo.action.serviceName + '/' + repo.action.GetAll,
 				async: !!options.async,
@@ -626,7 +684,7 @@ var DefaultOptions = {
 					if (!_isArray(data)) {
 						log.ERROR('GetAll', def.name + ' did not return array', data);
 					}
-					
+
 					var cacheCopy = cloneMap(_cache);
 
 					repo.Content.valueWillMutate();
@@ -645,16 +703,16 @@ var DefaultOptions = {
 							for (var key in cacheCopy) {
 								_removeFromCache(key);
 							}
-							
-							//if (options.sorted) {
-							//	repo.Content().sort();
-							//}
+
+							////if (options.sorted) {
+							////	repo.Content().sort();
+							////}
 							repo.Content.valueHasMutated();
-							
+
 							if (_isFunc(options.result)) {
 								options.result(true);
 							}
-							//repo.IsBusy(false);
+							////repo.IsBusy(false);
 						} else {
 							setTimeout(work, 0);
 						}
@@ -666,15 +724,18 @@ var DefaultOptions = {
 					}
 				},
 				error: function (xhr) {
-					log.ERROR('GetAll', def.name + ' server error: ' + xhr.status, xhr);
 					if (_isFunc(options.result)) {
-						options.result(false);
+						if (options.result(false) === true) {
+							return;
+						}
 					}
+					log.ERROR('GetAll', def.name + ' server error: ' + xhr.status, xhr);
 				}
 			});
 			return repo.Content();
 		};
-		
+		repo.GetAll.isCaller = true;
+
 		// @options is a dictionary of:
 		//    async (bool), defaults true - execute asynchronously
 		//    params (dictionary) - key-value pairs to send as GET parameters
@@ -685,8 +746,8 @@ var DefaultOptions = {
 					return;
 				}
 			}
-			
-			//inst.IsBusy(true);
+
+			////inst.IsBusy(true);
 			options = options || {};
 			var params = (options.params || {});
 			params.item = inst.toJSON();
@@ -721,7 +782,7 @@ var DefaultOptions = {
 					if (_isFunc(options.result)) {
 						options.result(true);
 					}
-					//inst.IsBusy(false);
+					////inst.IsBusy(false);
 				},
 				error: function (xhr) {
 					inst.handleError(xhr); // TODO
@@ -731,16 +792,117 @@ var DefaultOptions = {
 					if (_isFunc(options.result)) {
 						options.result(false);
 					}
-					//inst.IsBusy(false);
+					////inst.IsBusy(false);
 				}
 			});
 		};
+		repo.SaveToServer.isCaller = true;
+
+		/**
+		 * @param {String} action
+		 * @param {Object} data
+		 * @param {Function} handler
+		 * @param {Object} [options]
+		 * @param {Boolean} [options.async=false]
+		 * @param {Boolean} [options.post=true]
+		 */
+		repo.Call = function (action, data, handler, options) {
+			options = options || {};
+			
+			eko.utils.ajax.call(this, {
+				url: '' + repo.action.baseUrl + repo.action.serviceName + '/' + (options.action || action),
+				post: options.post != false,
+				async: !!options.async,
+				data: data,
+				success: function (data) {
+					handler.call(this, true, data);
+				},
+				error: function (data) {
+					handler.call(this, false, data);
+				}
+			});
+		};
+
+		/**
+		 * @param {String} name
+		 * @param {Array} params
+		 * @param {Function} [handler=null]
+		 * @param {Object} [options]
+		 * @param {String} [options.action=@name]
+		 * @param {Boolean} [options.async=false]
+		 * @param {Boolean} [options.post=true]
+		 */
+		repo.define = function (name, params, handler, options) {
+			if (name in repo && (!_isFunc(repo[name]) || !repo[name].isCaller)) {
+				log.ERROR('define', 'Cannot overwrite internal functionality: ' + name);
+			}
+
+			options = options || {};
+			function caller(cb1, cb2, args) {
+				if (args.length !== params.length) {
+					log.ERROR(name, 'Number of supplied arguments does not match definition (' + params.length + ')', arguments)
+				}
+				if (!cb1 && !cb2) {
+					log.ERROR(name, 'No callback defined for ' + name);
+				}
+
+				var data = {};
+				for (var i = 0; i < args.length; ++i) {
+					data[params[i]] = args[i];
+				}
+
+				eko.utils.ajax.call(this, {
+					url: '' + repo.action.baseUrl + repo.action.serviceName + '/' + (options.action || name),
+					post: options.post != false,
+					async: !!options.async,
+					data: data,
+					success: function (data) {
+						if (cb1) {
+							cb1.call(this, true, data);
+						}
+						if (cb2) {
+							cb2.call(this, true, data);
+						}
+					},
+					error: function (data) {
+						if (cb1) {
+							cb1.call(this, false, data);
+						}
+						if (cb2) {
+							cb2.call(this, false, data);
+						}
+					}
+				});
+			}
+			repo[name] = function () {
+				caller.call(this, handler, null, arguments);
+			};
+			repo[name].and = function () {
+				arguments = Array.prototype.slice.call(arguments);
+				var additional = arguments.pop();
+				if (typeof additional !== 'function') {
+					log.ERROR(name, 'Expected callback function as final argument for ' + name + '.and', additional);
+				}
+				caller.call(this, handler, additional, arguments);
+			};
+			repo[name].do = function () {
+				arguments = Array.prototype.slice.call(arguments);
+				var replacement = arguments.pop();
+				if (typeof replacement !== 'function') {
+					log.ERROR(name, 'Expected callback function as final argument for ' + name + '.do', replacement);
+				}
+				caller.call(this, null, replacement, arguments);
+			};
+			repo[name].isCaller = true;
+
+			return repo;
+		};
 	};
-	
+
 	/** Repository factory namespace **/
 	eko.repositories = new (function () {
 		var _cache = {};
-		
+
 		/***
 		Clears all cached repositories.
 		***/
@@ -753,7 +915,7 @@ var DefaultOptions = {
 				// TODO
 			}
 		};
-		
+
 		/***
 		Create a new repository based on a named model.
 		@def: Object with model definition / overrides
@@ -775,10 +937,10 @@ var DefaultOptions = {
 				log.ERROR('create', 'No model definition name supplied');
 			}
 			def = def || {};
-			
+
 			// Ensure model exists correctly
 			var modelType = modelName;
-			if (!_isFunc(window[modelType]) && _isFunc(window[modelType + 'Model'])) {
+			if (!_isFunc(window[modelType])) {
 				modelType += 'Model';
 			}
 			if (!_isFunc(window[modelType])) {
@@ -788,17 +950,22 @@ var DefaultOptions = {
 					window[modelType] = function () { };
 				}
 			}
-			
-			var item = new window[modelType]();
-			var keys = item.Keys || def.Keys;
+
+			var keys = def.Keys || window[modelType].prototype.Keys;
+			var fields = def.Fields || window[modelType].prototype.Fields;
+			if (!keys || !fields) {
+				// Use instance to get for Keys/Fields
+				var item = new window[modelType]();
+				keys = keys || item.Keys;
+				fields = fields || item.Fields;
+			}
 			if (!keys || !keys.length) {
 				log.ERROR('create', 'Failed to locate model keys: ' + modelName);
 			}
-			var fields = item.Fields || def.Fields;
 			if (!fields || !_isArray(fields)) {
 				log.ERROR('create', 'Failed to locate model fields: ' + modelName);
 			}
-			
+
 			_cache[modelName] = new eko.Repository({
 				name: modelName,
 				keys: keys,
@@ -806,11 +973,11 @@ var DefaultOptions = {
 				action: def.action || {},
 				overrides: def
 			}, window[modelType]);
-			
+
 			eko.repositories[modelName] = _cache[modelName];
 			return _cache[modelName];
 		};
-		
+
 		this.get = function (modelName) {
 			if (modelName in _cache) {
 				return _cache[modelName];

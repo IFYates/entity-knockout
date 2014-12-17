@@ -1,3 +1,14 @@
+if (!Array.prototype.indexOf) {
+	Array.prototype.indexOf = function (val) {
+		for (var i = 0; i < this.length; ++i) {
+			if (this[i] === val) {
+				return i;
+			}
+		}
+		return -1;
+	};
+}
+
 window.ko = (function () {
 	var _capturing = false, _stack = [];
 	return {
@@ -6,27 +17,23 @@ window.ko = (function () {
 			var _subs = [], _subd = [];
 			var subr = function () {
 				_latest = false;
-				valueWillMutate();
-				valueHasMutated();
-			};
-			
-			function valueWillMutate() {
-				++_suspend;
-			};
-			function valueHasMutated() {
-				if (_suspend > 0 && --_suspend === 0) {
-					for (var i = 0; i < _subs.length; ++i) {
-						_subs[i](_value);
-					}
-				}
+				api.valueWillMutate();
+				api.valueHasMutated();
 			};
 			
 			var api = function () {
+				if (arguments.length > 0) {
+					if (typeof options.write !== 'function') {
+						throw new Error('Computed cannot be written to without "write" function.');
+					}
+					options.write(arguments[0]);
+					return;
+				}
 				if (_capturing && _stack.indexOf(api) < 0) {
 					_stack.push(api);
 				}
 				if (_value === undefined || !_latest) {
-					valueWillMutate();
+					api.valueWillMutate();
 					for (var i = 0; i < _subd.length; ++i) {
 						_subd[i].unsubscribe(subr);
 					}
@@ -43,7 +50,7 @@ window.ko = (function () {
 					for (var i = 0; i < _subd.length; ++i) {
 						_subd[i].subscribe(subr);
 					}
-					valueHasMutated();
+					api.valueHasMutated();
 				}
 				return _value;
 			};
@@ -56,6 +63,16 @@ window.ko = (function () {
 			api.unsubscribe = function (fn) {
 				if ((i = _subs.indexOf(fn)) >= 0) {
 					_subs.splice(i, 1);
+				}
+			};
+			api.valueWillMutate = function () {
+				++_suspend;
+			};
+			api.valueHasMutated = function () {
+				if (_suspend > 0 && --_suspend === 0) {
+					for (var i = 0; i < _subs.length; ++i) {
+						_subs[i](_value);
+					}
 				}
 			};
 			return api;
@@ -100,12 +117,7 @@ window.ko = (function () {
 				// TODO
 			};
 			api.indexOf = function (val) {
-				for (var i = 0; i < _value.length; ++i) {
-					if (_value[i] === val) {
-						return i;
-					}
-				}
-				return -1;
+				return _value.indexOf(val);
 			};
 			return api;
 		}
