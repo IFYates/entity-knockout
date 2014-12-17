@@ -292,7 +292,7 @@ var DefaultOptions = {
 		proto.IsNew = ko.observable(true);
 		proto.IsDirty = ko.observable(true);
 		////proto.IsBusy = ko.observable(false); // Updating, Saving, Deleting
-
+		
 		// Create keys
 		for (var i = 0; i < def.keys.length; ++i) {
 			if (!(field in proto)) {
@@ -665,7 +665,7 @@ var DefaultOptions = {
 			return item;
 		};
 		repo.Get.isCaller = true;
-
+		
 		// @options is a dictionary of:
 		//    async (bool), defaults false - execute asynchronously (return value is useless; set 'callback' if needed)
 		//    result (function) - called with bool of success
@@ -703,7 +703,7 @@ var DefaultOptions = {
 							for (var key in cacheCopy) {
 								_removeFromCache(key);
 							}
-
+							
 							////if (options.sorted) {
 							////	repo.Content().sort();
 							////}
@@ -735,7 +735,7 @@ var DefaultOptions = {
 			return repo.Content();
 		};
 		repo.GetAll.isCaller = true;
-
+		
 		// @options is a dictionary of:
 		//    async (bool), defaults true - execute asynchronously
 		//    params (dictionary) - key-value pairs to send as GET parameters
@@ -746,7 +746,7 @@ var DefaultOptions = {
 					return;
 				}
 			}
-
+			
 			////inst.IsBusy(true);
 			options = options || {};
 			var params = (options.params || {});
@@ -894,7 +894,6 @@ var DefaultOptions = {
 				caller.call(this, null, replacement, arguments);
 			};
 			repo[name].isCaller = true;
-
 			return repo;
 		};
 	};
@@ -950,7 +949,7 @@ var DefaultOptions = {
 					window[modelType] = function () { };
 				}
 			}
-
+			
 			var keys = def.Keys || window[modelType].prototype.Keys;
 			var fields = def.Fields || window[modelType].prototype.Fields;
 			if (!keys || !fields) {

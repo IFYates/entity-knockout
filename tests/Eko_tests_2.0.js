@@ -2096,7 +2096,10 @@ describe('Repository custom methods', function () {
 		};
 		
 		var repo = eko.repositories.create('User');
-		repo.define('Test', [ 'one', 'two' ], function () { });
+		repo.define('Test', [ 'one', 'two' ], function (success, result) {
+			expect(success).toEqual(false);
+			expect(result).toEqual(1);
+		});
 		repo.Test(1, 'a');
 		expect(called).toEqual(true);
 	});
