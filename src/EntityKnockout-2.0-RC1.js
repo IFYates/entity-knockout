@@ -51,15 +51,18 @@ var DefaultOptions = {
 		};
 	})();
 
-	// Will match true arrays and ko.observableArray
 	function _isArray(obj) {
-		return obj && typeof obj === 'object' && _isFunc(obj.splice);
+		// Will match true arrays and ko.observableArray
+		return (obj && obj.__proto__ === Array.prototype) || (_isFunc(obj) && _isFunc(obj.splice));
 	}
 	function _isDate(obj) {
-		return obj && typeof obj === 'function' && obj.constructor.prototype === Date.prototype;
+		return obj && obj.__proto__ === Date.prototype;
+	}
+	function _isObj(obj) {
+		return obj && obj.__proto__ === Object.prototype;
 	}
 	function _isFunc(obj) {
-		return typeof obj === 'function';
+		return obj && typeof obj === 'function';
 	}
 	function is(val) {
 		return val !== null && val !== undefined;
@@ -241,6 +244,7 @@ var DefaultOptions = {
 		}
 
 		// Convert number from string
+		var num;
 		if (typeof val === 'string' && !isNaN(num = Number(val)) && val === num.toString()) {
 			val = num;
 		}
@@ -266,7 +270,13 @@ var DefaultOptions = {
 
 	// Decorate basic model with EKO functionality
 	// Online called on Create or first Attach
-	function _completeModelPrototype(def, proto) {
+	function _completeModelPrototype(def, constr) {
+		if (constr && constr.__eko__) {
+			return;
+		}
+
+		var proto = constr.prototype;
+
 		// Fixed values
 		proto.modelName = def.name;
 		proto.repository = null;
@@ -288,43 +298,11 @@ var DefaultOptions = {
 			proto.OnSaved = def.overrides.OnSaved;
 		}
 
-		// Set duck type
-		proto.IsNew = ko.observable(true);
-		proto.IsDirty = ko.observable(true);
-		////proto.IsBusy = ko.observable(false); // Updating, Saving, Deleting
-		
-		// Create keys
-		for (var i = 0; i < def.keys.length; ++i) {
-			if (!(field in proto)) {
-				proto[field] = null;
-			}
-		}
-
-		// Create fields (TODO: defaults)
-		for (var i = 0; i < def.fields.length; ++i) {
-			var field = def.fields[i];
-			if (!(field in proto)) {
-				proto[field] = ko.observable();
-			}
-			if (_isFunc(proto[field])) {
-				////item[field].model = item;
-				////item[field].fieldName = field;
-				////item[field].IsDirty = ko.observable(false); // TODO: review
-				////item[field].subscribe(function() {
-				////	item.IsDirty(true);
-				////	item[field].IsDirty(true);
-				////});
-			}
-		}
-		
 		proto.clone = function () {
 		    return this.repository.CreateNew(this.toPOJO());
 		};
 
 		// Default functionality
-		proto.Delete = function () {
-			// TODO?
-		};
 		proto.Update = function (data) {
 			var inst = this;
 			////inst.IsBusy(true);
@@ -375,12 +353,12 @@ var DefaultOptions = {
 						}
 
 						// Convert to POJO
-						for (var i = 0; i < val.length; ++i) {
-							if (typeof val[i] === 'object') {
-								if (_isFunc(val[i].toPOJO)) {
-									val[i] = val[i].toPOJO();
+						for (var j = 0; j < val.length; ++j) {
+							if (typeof val[j] === 'object') {
+								if (_isFunc(val[j].toPOJO)) {
+									val[j] = val[j].toPOJO();
 								} else {
-									val[i] = _unwrap(val[i]);
+									val[j] = _unwrap(val[j]);
 								}
 							}
 						}
@@ -407,11 +385,49 @@ var DefaultOptions = {
 		proto.toJSON = function () {
 			return JSON.stringify(this.toPOJO());
 		};
+
+		// State variables must be set per entity
+		window[def.type] = function () {
+			var obj = this;
+			constr.apply(this, arguments);
+			obj.__proto__ = proto;
+
+			obj.IsNew = ko.observable(true);
+			obj.IsDirty = ko.observable(true);
+			////obj.IsBusy = ko.observable(false); // Updating, Saving, Deleting
+
+			// Create keys
+			for (var i = 0; i < def.keys.length; ++i) {
+				var key = def.keys[i];
+				if (!(key in obj)) {
+					obj[key] = null;
+				}
+			}
+
+			// Create fields (TODO: defaults)
+			for (var i = 0; i < def.fields.length; ++i) {
+				var field = def.fields[i];
+				if (!(field in obj)) {
+					obj[field] = ko.observable();
+				}
+				if (_isFunc(obj[field]) && obj[field].subscribe) {
+					obj[field].model = obj;
+					obj[field].fieldName = field;
+					////obj[field].IsDirty = ko.observable(false); // TODO: review
+					obj[field].subscribe(function () {
+						obj.IsDirty(true);
+						////obj[field].IsDirty(true);
+					});
+				}
+			}
+		}
+		window[def.type].prototype = proto;
+		window[def.type].__eko__ = true;
 	};
 
 	/** Repository definition **/
 	eko.Repository = function (def, constr) {
-		_completeModelPrototype(def, constr.prototype);
+		_completeModelPrototype(def, constr);
 
 		var repo = this;
 		var _cache = {};
@@ -430,7 +446,22 @@ var DefaultOptions = {
 		};
 
 		repo.ModelName = function () { return def.name; };
+
 		repo.Content = ko.observableArray([]);
+		repo.Content.toJSON = function () {
+			// TODO: test
+			return JSON.stringify(this.toPOJO());
+		}
+		repo.Content.toPOJO = function () {
+			// TODO: test
+			var arr = repo.Content();
+			var pojo = [];
+			for (var i = 0; i < arr.length; ++i) {
+				pojo.push(arr[i].toPOJO());
+			}
+			return pojo;
+		}
+
 		repo.Count = function () { return repo.Content().length; };
 
 		// Get the model key from the raw data or item
@@ -485,7 +516,7 @@ var DefaultOptions = {
 				var items = repo.Content();
 				for (var i = 0; i < items; ++i) {
 					if (items[i] === _cache[key]) {
-						////_explicitlyRemoveSubscribers(item);
+						// TODO: removeSubscriptions(item);
 						repo.Content().splice(i, 1);
 						break;
 					}
@@ -503,13 +534,9 @@ var DefaultOptions = {
 			for (var key in cacheCopy) {
 				_removeFromCache(key);
 			}
-			self.Content.removeAll();
+			repo.Content.removeAll();
 			repo.Content.valueHasMutated();
 			_cache = {};
-		};
-
-		self.RemoveSubscribers = function (model) {
-			////_explicitlyRemoveSubscribers(model);
 		};
 
 		/***
@@ -554,7 +581,7 @@ var DefaultOptions = {
 					_cache[key].Update(item);
 				} else {
 					// Convert to entity
-					if (item.prototype !== constr.prototype) {
+					if (item.__proto__ !== constr.prototype) { // TODO: Broken?
 						item = repo.CreateNew(item);
 					}
 
@@ -582,7 +609,7 @@ var DefaultOptions = {
 
 		// Create new instance of model - unattached
 		repo.CreateNew = function (data) {
-			var inst = new constr();
+			var inst = new window[def.type]();
 			_fillModelKey(inst, data || {});
 			if (data) {
 				inst.Update(data);
@@ -665,7 +692,7 @@ var DefaultOptions = {
 			return item;
 		};
 		repo.Get.isCaller = true;
-		
+
 		// @options is a dictionary of:
 		//    async (bool), defaults false - execute asynchronously (return value is useless; set 'callback' if needed)
 		//    result (function) - called with bool of success
@@ -703,7 +730,7 @@ var DefaultOptions = {
 							for (var key in cacheCopy) {
 								_removeFromCache(key);
 							}
-							
+
 							////if (options.sorted) {
 							////	repo.Content().sort();
 							////}
@@ -735,7 +762,7 @@ var DefaultOptions = {
 			return repo.Content();
 		};
 		repo.GetAll.isCaller = true;
-		
+
 		// @options is a dictionary of:
 		//    async (bool), defaults true - execute asynchronously
 		//    params (dictionary) - key-value pairs to send as GET parameters
@@ -746,7 +773,7 @@ var DefaultOptions = {
 					return;
 				}
 			}
-			
+
 			////inst.IsBusy(true);
 			options = options || {};
 			var params = (options.params || {});
@@ -800,13 +827,24 @@ var DefaultOptions = {
 
 		/**
 		 * @param {String} action
-		 * @param {Object} data
-		 * @param {Function} handler
+		 * @param {Object} [data]
+		 * @param {Function} handler (success, data)
 		 * @param {Object} [options]
 		 * @param {Boolean} [options.async=false]
 		 * @param {Boolean} [options.post=true]
+		 * @param {Boolean} [options.json=true]
 		 */
 		repo.Call = function (action, data, handler, options) {
+			if (!is(options)) { // TODO: test
+				if (_isObj(handler)) {
+					options = handler;
+					handler = null;
+				}
+				if (!is(handler) && _isFunc(data)) {
+					handler = data;
+					data = null;
+				}
+			}
 			options = options || {};
 			
 			eko.utils.ajax.call(this, {
@@ -815,10 +853,17 @@ var DefaultOptions = {
 				async: !!options.async,
 				data: data,
 				success: function (data) {
-					handler.call(this, true, data);
+					if (options.json != false) {
+						data = JSON.parse(data); // TODO: handle bad JSON as error
+					}
+					if (handler) {
+						handler.call(this, true, data);
+					}
 				},
 				error: function (data) {
-					handler.call(this, false, data);
+					if (handler) {
+						handler.call(this, false, data);
+					}
 				}
 			});
 		};
@@ -894,6 +939,7 @@ var DefaultOptions = {
 				caller.call(this, null, replacement, arguments);
 			};
 			repo[name].isCaller = true;
+
 			return repo;
 		};
 	};
@@ -939,8 +985,10 @@ var DefaultOptions = {
 
 			// Ensure model exists correctly
 			var modelType = modelName;
-			if (!_isFunc(window[modelType])) {
+			if (modelName.length < 6 || modelName.substring(modelName.length - 5).toLowerCase() !== 'model') {
 				modelType += 'Model';
+			} else {
+				modelName = modelName.substring(0, modelName.length - 5);
 			}
 			if (!_isFunc(window[modelType])) {
 				if (!def) {
@@ -949,7 +997,7 @@ var DefaultOptions = {
 					window[modelType] = function () { };
 				}
 			}
-			
+
 			var keys = def.Keys || window[modelType].prototype.Keys;
 			var fields = def.Fields || window[modelType].prototype.Fields;
 			if (!keys || !fields) {
@@ -967,6 +1015,7 @@ var DefaultOptions = {
 
 			_cache[modelName] = new eko.Repository({
 				name: modelName,
+				type: modelType,
 				keys: keys,
 				fields: fields,
 				action: def.action || {},

@@ -325,16 +325,45 @@ describe('Creating repository instance', function () {
 		window.AnonModel = undefined;
 	});
 	
+	it('doesn\'t break model tests', function () {
+		expect(typeof window.UserModel).toEqual('function');
+		//window.UserModel.prototype.constructor.toString()
+		var pre = new window.UserModel();
+		expect(typeof pre).toEqual('object');
+		
+		// This changes the definition
+		var repo = eko.repositories.create('User');
+		
+		var raw = new window.UserModel();
+		
+		var inst = repo.CreateNew();
+		
+		expect(inst.__proto__).toEqual(raw.__proto__);
+		expect(inst.__proto__).toEqual(pre.__proto__);
+	});
+	
+	it('includes eko methods on to model', function () {
+		var repo = eko.repositories.create('User');
+		var inst = repo.CreateNew();
+		expect(inst.clone).toBeDefined();
+		expect(inst.IsNew).toBeDefined();
+		expect(inst.IsDirty).toBeDefined();
+		expect(inst.Save).toBeDefined();
+		expect(inst.toJSON).toBeDefined();
+		expect(inst.toPOJO).toBeDefined();
+		expect(inst.Update).toBeDefined();
+	});
+	
 	it('builds to match defined model by full or partial name', function () {
 		var repo = eko.repositories.create('User');
 		var inst = repo.CreateNew();
-		expect(inst.constructor.prototype).toEqual(window.UserModel.prototype);
+		expect(inst.modelName).toEqual('User');
 		expect(inst.id).toBeDefined();
 		expect(inst.name).toBeDefined();
 		
 		repo = eko.repositories.create('UserModel');
 		inst = repo.CreateNew();
-		expect(inst.constructor.prototype).toEqual(window.UserModel.prototype);
+		expect(inst.modelName).toEqual('User');
 		expect(inst.id).toBeDefined();
 		expect(inst.name).toBeDefined();
 	});
@@ -345,7 +374,7 @@ describe('Creating repository instance', function () {
 			Fields: [ 'name2', 'score2' ]
 		});
 		var inst = repo.CreateNew();
-		expect(inst.constructor.prototype).toEqual(window.UserModel.prototype);
+		expect(inst.modelName).toEqual('User');
 		expect(inst.id).not.toBeDefined();
 		expect(inst.name).not.toBeDefined();
 		expect(inst.id2).toBeDefined();
@@ -356,7 +385,7 @@ describe('Creating repository instance', function () {
 			Fields: [ 'name2', 'score2' ]
 		});
 		inst = repo.CreateNew();
-		expect(inst.constructor.prototype).toEqual(window.UserModel.prototype);
+		expect(inst.modelName).toEqual('User');
 		expect(inst.id).not.toBeDefined();
 		expect(inst.name).not.toBeDefined();
 		expect(inst.id2).toBeDefined();
@@ -369,7 +398,7 @@ describe('Creating repository instance', function () {
 		
 		var repo = eko.repositories.create('User');
 		var inst = repo.CreateNew();
-		expect(inst.constructor.prototype).toEqual(window.UserModel.prototype);
+		expect(inst.modelName).toEqual('User');
 		expect(inst.id).not.toBeDefined();
 		expect(inst.name).not.toBeDefined();
 		expect(inst.id3).toBeDefined();
@@ -377,7 +406,7 @@ describe('Creating repository instance', function () {
 		
 		repo = eko.repositories.create('UserModel');
 		inst = repo.CreateNew();
-		expect(inst.constructor.prototype).toEqual(window.UserModel.prototype);
+		expect(inst.modelName).toEqual('User');
 		expect(inst.id).not.toBeDefined();
 		expect(inst.name).not.toBeDefined();
 		expect(inst.id3).toBeDefined();
@@ -508,7 +537,9 @@ describe('Creating a blank entity', function () {
 		var model = repo.CreateNew();
 		expect(model.dbKey).toBeDefined();
 		expect(model.modelName).toBeDefined();
+		expect(model.modelName).toEqual('User');
 		expect(model.repository).toBeDefined();
+		expect(model.repository).toEqual(repo);
 		expect(model.IsNew).toBeDefined();
 		expect(typeof model.IsNew).toBe('function');
 		expect(model.IsDirty).toBeDefined();
@@ -659,14 +690,36 @@ describe('Entities definitions', function () {
 		expect(repo).toBeTruthy();
 	});
 	
-	xit('can specify call function', function () {
-		var repo = eko.repositories.create('UnknownModel', { Keys: ['id'], Fields: ['name'],
-			Call: {
-				'GetByName': function (name) { }
-			}
-		});
-		var model = repo.CreateNew();
-		expect(model.GetByName).toBeTruthy();
+	it('can have additional functionality before creation', function () {
+		window.UserModel = function () {
+			var self = this;
+			self.Keys = ['id'];
+			self.Fields = ['name', 'score'];
+			self.called = false;
+		};
+		
+		window.UserModel.prototype.Test = function () { this.called = true };
+		var repo = eko.repositories.create('User');
+		var inst = repo.CreateNew();
+		expect(inst.Test).toBeDefined();
+		inst.Test();
+		expect(inst.called).toBe(true);
+	});
+	
+	it('can have additional functionality after creation', function () {
+		window.UserModel = function () {
+			var self = this;
+			self.Keys = ['id'];
+			self.Fields = ['name', 'score'];
+			self.called = false;
+		};
+		
+		var repo = eko.repositories.create('User');
+		window.UserModel.prototype.Test = function () { this.called = true };
+		var inst = repo.CreateNew();
+		expect(inst.Test).toBeDefined();
+		inst.Test();
+		expect(inst.called).toBe(true);
 	});
 	
 	xit('can include event functionality', function () {
@@ -894,13 +947,14 @@ describe('Update entity', function () {
 	it('pauses updates and resumes for any field', function () {
 		var pause = false, resume = false;
 		var repo = eko.repositories.create('User');
-		window.UserModel.prototype.name.valueWillMutate = function () {
+		var inst = repo.CreateNew({ id: 1 });
+		inst.name.valueWillMutate = function () {
 			pause = true;
 		};
-		window.UserModel.prototype.name.valueHasMutated = function () {
+		inst.name.valueHasMutated = function () {
 			resume = true;
 		};
-		var inst = repo.CreateNew({ id: 1, name: 'green' });
+		inst.Update({ name: 'green' });
 		expect(pause).toBeTruthy();
 		expect(resume).toBeTruthy();
 		expect(inst.name()).toBe('green');
@@ -1061,7 +1115,18 @@ describe('Fetch an entity', function () {
 		expect(inst.id).toEqual(1);
 	});
 	
-	it('will update instance if forced to find on server', function () {
+	it('will not be new once attached', function () {
+		eko.utils.ajax = function (options) {
+			options.success('{"id":1}');
+		};
+		var repo = eko.repositories.create('User');
+		var inst = repo.CreateNew({ id: 1 });
+		expect(inst.IsNew()).toEqual(true);
+		inst = repo.Get('1');
+		expect(inst.IsNew()).toEqual(false);
+	});
+	
+	it('will update entity if forced to find on server', function () {
 		eko.utils.ajax = function (options) {
 			options.success('{"id":1,"name":"Bob"}');
 		};
@@ -1071,6 +1136,38 @@ describe('Fetch an entity', function () {
 		expect(inst).toBeTruthy();
 		expect(inst.id).toEqual(1);
 		expect(inst.name()).toEqual('Bob');
+	});
+	
+	it('will only update keyed entity', function () {
+		eko.utils.ajax = function (options) {
+			options.success('{"id":1,"name":"Bob"}');
+		};
+		var repo = eko.repositories.create('User');
+		var inst1 = repo.Attach({ id: 1 });
+		var inst2 = repo.Attach({ id: 2, name: 'Fred' });
+		repo.Get('1', { from: 'server' });
+		expect(inst2.name()).toEqual('Fred');
+	});
+	
+	it('updates same entity instance', function () {
+		eko.utils.ajax = function (options) {
+			options.success('{"id":1,"name":"Bob"}');
+		};
+		var repo = eko.repositories.create('User');
+		var inst1 = repo.Attach({ id: 1 });
+		var inst2 = repo.Get('1', { from: 'server' });
+		expect(inst1).toEqual(inst2);
+	});
+	
+	it('will not be dirty once updated', function () {
+		eko.utils.ajax = function (options) {
+			options.success('{"id":1,"name":"Bob"}');
+		};
+		var repo = eko.repositories.create('User');
+		var inst = repo.CreateNew({ id: 1 });
+		expect(inst.IsNew()).toEqual(true);
+		inst = repo.Get('1', { from: 'server' });
+		expect(inst.IsDirty()).toEqual(false);
 	});
 	
 	it('does not accept arrays', function () {
@@ -1119,6 +1216,36 @@ describe('Fetch an entity', function () {
 		});
 		expect(inst2).toBeTruthy();
 		expect(inst2).toEqual(inst1);
+	});
+	
+	it('will leave new mark for unrelated entity', function () {
+		eko.utils.ajax = function (options) {
+			options.success('{"id":1}');
+		};
+		var repo = eko.repositories.create('User');
+		var inst1 = repo.CreateNew({ id: 1 });
+		var inst2 = repo.CreateNew({ id: 2 });
+		expect(inst1.IsNew()).toEqual(true);
+		expect(inst2.IsNew()).toEqual(true);
+		inst1 = repo.Get('1');
+		expect(inst1.IsNew()).toEqual(false);
+		expect(inst2.IsNew()).toEqual(true);
+	});
+	
+	it('will leave dirty mark for unrelated entity', function () {
+		eko.utils.ajax = function (options) {
+			options.success('{"id":1}');
+		};
+		var repo = eko.repositories.create('User');
+		var inst1 = repo.Attach({ id: 1 });
+		inst1.name('Test 1');
+		var inst2 = repo.Attach({ id: 2 });
+		inst2.name('Test 2');
+		expect(inst1.IsDirty()).toEqual(true);
+		expect(inst2.IsDirty()).toEqual(true);
+		repo.Get('1', { from: 'server' });
+		expect(inst1.IsDirty()).toEqual(false);
+		expect(inst2.IsDirty()).toEqual(true);
 	});
 	
 	it('with async:true will return null but attach instance if loaded from server', function (done) {
@@ -1585,7 +1712,7 @@ describe('Array fields', function () {
 		expect(inst.colours().length).toBe(3);
 	});
 	
-	it('can be handled differently', function () {
+	it('can be handled differently with OnSet', function () {
 		var calledOnSet = false;
 		var repo = eko.repositories.create('User');
 		window.UserModel.prototype.OnSetcolours = function (arr) {
@@ -1598,16 +1725,17 @@ describe('Array fields', function () {
 		expect(inst.colours().length).toBe(3);
 	});
 	
-	it('on set will pause array updates and resume', function () {
+	it('on change will pause array updates and resume', function () {
 		var pause = false, resume = false;
 		var repo = eko.repositories.create('User');
-		window.UserModel.prototype.colours.valueWillMutate = function () {
+		var inst = repo.CreateNew({ id: 1 });
+		inst.colours.valueWillMutate = function () {
 			pause = true;
 		};
-		window.UserModel.prototype.colours.valueHasMutated = function () {
+		inst.colours.valueHasMutated = function () {
 			resume = true;
 		};
-		var inst = repo.CreateNew({ id: 1, colours: [ 'red', 'blue', 'green' ] });
+		inst.Update({ colours: [ 'red', 'blue', 'green' ] });
 		expect(pause).toBeTruthy();
 		expect(resume).toBeTruthy();
 		expect(inst.colours()).toBeTruthy();
@@ -1676,7 +1804,7 @@ describe('Entities instances produce JSON', function () {
 	it('without fields that have been physically removed', function () {
 		var repo = eko.repositories.create('User');
 		var inst = repo.CreateNew({ id: 1, name: 'Test', score: 0.5 });
-		delete inst.constructor.prototype.name;
+		delete inst.name;
 		expect(inst.toJSON()).toBe('{"id":1,"score":0.5,"IsNew":true}');
 	});
 	
@@ -1695,7 +1823,10 @@ describe('Related entities', function () {
 			self.Keys = [ 'id' ];
 			self.Fields = [ 'name', 'parentId' ];
 			
-			self.parent = eko.entity(self.parentId, 'User');
+			self.OnCreated = function () {
+				// Bind to field after created
+				self.parent = eko.entity(self.parentId, 'User');
+			};
 		};
 	});
 	
@@ -1715,9 +1846,10 @@ describe('Related entities', function () {
 	});
 	
 	it('can be defined using static field', function () {
-		var repo = eko.repositories.create('User');
 		window.UserModel.prototype.parentId = null;
+		var repo = eko.repositories.create('User');
 		var inst = repo.CreateNew({ id: 1, name: 'Child' });
+		expect(typeof inst.parentId).toBeDefined();
 		expect(typeof inst.parentId).not.toEqual('function');
 		expect(typeof inst.parent).toEqual('function');
 	});
@@ -1743,16 +1875,23 @@ describe('Related entities', function () {
 	});
 	
 	it('will not work if static key used on definition', function () {
+		window.UserModel = function () {
+			var self = this;
+			self.Keys = [ 'id' ];
+			self.Fields = [ 'name', 'parentId' ];
+			self.parentId = null;
+			self.parent = eko.entity(self.parentId, 'User');
+		};
+		
 		var repo = eko.repositories.create('User');
-		window.UserModel.prototype.parentId = null;
 		var parent = repo.Attach({ id: 2, name: 'Parent' });
 		var inst = repo.CreateNew({ id: 1, name: 'Child', parentId: 2 });
 		expect(inst.parent()).toBeNull();
 	});
 	
 	it('will work if static key used after definition', function () {
-		var repo = eko.repositories.create('User');
 		window.UserModel.prototype.parentId = null;
+		var repo = eko.repositories.create('User');
 		var parent = repo.Attach({ id: 2, name: 'Parent' });
 		var inst = repo.CreateNew({ id: 1, name: 'Child', parentId: 2 });
 		inst.parent = eko.entity(inst.parentId, 'User');
@@ -1769,8 +1908,8 @@ describe('Related entities', function () {
 	});
 	
 	it('will not update when static value changes', function () {
-		var repo = eko.repositories.create('User');
 		window.UserModel.prototype.parentId = null;
+		var repo = eko.repositories.create('User');
 		var parent1 = repo.Attach({ id: 2, name: 'Parent 1' });
 		var parent2 = repo.Attach({ id: 3, name: 'Parent 2' });
 		var inst = repo.CreateNew({ id: 1, name: 'Child', parentId: 2 });
@@ -2096,10 +2235,7 @@ describe('Repository custom methods', function () {
 		};
 		
 		var repo = eko.repositories.create('User');
-		repo.define('Test', [ 'one', 'two' ], function (success, result) {
-			expect(success).toEqual(false);
-			expect(result).toEqual(1);
-		});
+		repo.define('Test', [ 'one', 'two' ], function () { });
 		repo.Test(1, 'a');
 		expect(called).toEqual(true);
 	});
@@ -2295,7 +2431,7 @@ describe('Repository custom methods', function () {
 	
 	it('can be called dynamically', function () {
 		eko.utils.ajax = function (options) {
-			options.success.call(this);
+			options.success.call(this, '{}');
 		};
 		
 		var repo = eko.repositories.create('User');
@@ -2309,7 +2445,7 @@ describe('Repository custom methods', function () {
 	it('can be called dynamically with args', function () {
 		eko.utils.ajax = function (options) {
 			expect(options.data.a).toEqual(1);
-			options.success.call(this);
+			options.success.call(this, '{}');
 		};
 		
 		var repo = eko.repositories.create('User');
@@ -2318,5 +2454,31 @@ describe('Repository custom methods', function () {
 			wasCalled = true;
 		});
 		expect(wasCalled).toEqual(true);
+	});
+	
+	it('automatically converts JSON', function () {
+		eko.utils.ajax = function (options) {
+			options.success.call(this, '{"test":1}');
+		};
+		
+		var repo = eko.repositories.create('User');
+		var result = null;
+		repo.Call('Test', { }, function (success, data) {
+			result = data;
+		});
+		expect(result).toEqual({ test: 1 });
+	});
+	
+	it('can be told not to convert JSON', function () {
+		eko.utils.ajax = function (options) {
+			options.success.call(this, '{"test":1}');
+		};
+		
+		var repo = eko.repositories.create('User');
+		var result = null;
+		repo.Call('Test', { }, function (success, data) {
+			result = data;
+		}, { json: false });
+		expect(result).toEqual('{"test":1}');
 	});
 });
