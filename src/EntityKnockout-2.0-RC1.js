@@ -173,24 +173,25 @@ var DefaultOptions = {
 			var impl = ko.computed({
 				deferEvaluation: true,
 				read: function () {
-					if (_value()) {
-						return _value();
-					}
-
-					var key = '';
-					if (_isArray(keys)) {
-						for (var i = 0; i < keys.length; ++i) {
-							if (i > 0) {
-								key += '|';
+					var value = _value();
+					if (!value) {
+						var key = '';
+						if (_isArray(keys)) {
+							for (var i = 0; i < keys.length; ++i) {
+								if (i > 0) {
+									key += '|';
+								}
+								key += _unwrap(keys[i]);
 							}
-							key += _unwrap(keys[i]);
+						} else {
+							key = _unwrap(keys);
 						}
-					} else {
-						key = _unwrap(keys);
+	
+						value = impl.repository().Get(key, options);
+						_value(value);
 					}
 
-					_value = impl.repository().Get(key, options);
-					return _value;
+					return value;
 				},
 
 				write: function (value) {
