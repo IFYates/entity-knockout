@@ -196,11 +196,12 @@ var DefaultOptions = {
 
 				write: function (value) {
 					impl.repository();
-					var value = null;
-					if (options.attach) {
-						value = _repo.Attach(value);
-					} else {
-						value = _repo.CreateNew(value);
+					if (value) {
+						if (options.attach) {
+							value = _repo.Attach(value);
+						} else {
+							value = _repo.CreateNew(value);
+						}
 					}
 					_value(value);
 					impl.notifySubscribers();
@@ -573,6 +574,7 @@ var DefaultOptions = {
 		@item: JSON string, POJO, array of POJOs, valid entity, array of valid entities
 		***/
 		repo.Attach = function (item) {
+			if (!item) return null;
 			var wasInAttach = _inAttach;
 			if (!_inAttach) {
 				repo.Content.valueWillMutate();
