@@ -130,10 +130,10 @@ var DefaultOptions = {
 					}
 					options.data = (data.length > 0 ? data.substring(1) : '');
 				}
-				
+
 				xhr.open(options.post ? 'POST' : 'GET', options.url, options.async != false);
 				xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-				
+
 				if (!options.post) {
 					options.data += '&_=' + Date.now(); // Cache-break for GET
 				} else {
@@ -186,7 +186,7 @@ var DefaultOptions = {
 						} else {
 							key = _unwrap(keys);
 						}
-	
+
 						value = impl.repository().Get(key, options);
 						_value(value);
 					}
@@ -229,24 +229,30 @@ var DefaultOptions = {
 			if (!repository || (typeof repository !== 'string' && repository.constructor.prototype !== eko.Repository.prototype)) {
 				log.ERROR('entityArray', 'Unknown argument value: repository', repository);
 			}
+
 			options = options || {};
 			options.attach = options.attach != false;
-			var _array = null;
+
+			var _value = ko.observable(null);
 			var impl = ko.computed({
 				deferEvaluation: true,
 				read: function () {
-					return _array;
+					return _value();
 				},
 				write: function (vals) {
 					impl.repository();
-					if (options.attach) {
-						_array = _repo.Attach(vals);
-					} else {
-						_array = [];
-						for (var i = 0; i < vals.length; ++i) {
-							_array.push(_repo.CreateNew(vals[i]));
+					var array = null;
+					if (vals) {
+						if (options.attach) {
+							array = _repo.Attach(vals);
+						} else {
+							array = [];
+							for (var i = 0; i < vals.length; ++i) {
+								array.push(_repo.CreateNew(vals[i]));
+							}
 						}
 					}
+					_value(array);
 					impl.notifySubscribers();
 				}
 			});
@@ -330,7 +336,7 @@ var DefaultOptions = {
 		}
 
 		proto.clone = function () {
-		    return this.repository.CreateNew(this.toPOJO());
+			return this.repository.CreateNew(this.toPOJO());
 		};
 
 		// Default functionality
@@ -878,7 +884,7 @@ var DefaultOptions = {
 				}
 			}
 			options = options || {};
-			
+
 			eko.utils.ajax.call(this, {
 				url: '' + repo.action.baseUrl + repo.action.serviceName + '/' + (options.action || action),
 				post: options.post != false,
