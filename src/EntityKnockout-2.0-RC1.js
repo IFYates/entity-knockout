@@ -169,12 +169,12 @@ var DefaultOptions = {
 			options.async = false;
 			options.attach = options.attach != false;
 
-			var _value = null;
+			var _value = ko.observable(null);
 			var impl = ko.computed({
 				deferEvaluation: true,
 				read: function () {
-					if (_value) {
-						return _value;
+					if (_value()) {
+						return _value();
 					}
 
 					var key = '';
@@ -189,18 +189,19 @@ var DefaultOptions = {
 						key = _unwrap(keys);
 					}
 
-					impl.repository();
-					_value = _repo.Get(key, options);
+					_value = impl.repository().Get(key, options);
 					return _value;
 				},
 
 				write: function (value) {
 					impl.repository();
+					var value = null;
 					if (options.attach) {
-						_value = _repo.Attach(value);
+						value = _repo.Attach(value);
 					} else {
-						_value = _repo.CreateNew(value);
+						value = _repo.CreateNew(value);
 					}
+					_value(value);
 					impl.notifySubscribers();
 				}
 			});
