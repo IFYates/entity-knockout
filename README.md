@@ -1,6 +1,13 @@
 # EntityKnockout (Eko)
 v2.0-RC1
 
+## v2.0 changes
+**Note:** Documentation below is not correct for v2.0-RC1
+- Server interaction less prominent, as local repository functionality the key function
+- More modular code
+- Improved codebase
+- Direct support for more complicated entity relationships
+
 ## Changelog
 - Added Detach method to repo
 - Standardised coding style

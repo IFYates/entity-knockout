@@ -151,23 +151,30 @@ var DefaultOptions = {
 
 		/**
 		 * @param {Object} [options=null] Options to use when getting the related entity (see Repository.Get)
+		 * @param {Boolean} [options.async=false]
+		 * @param {Boolean} [options.attach=true]
 		 */
 		entity: function (keys, repository, options) {
-			var _repo = null;
+			if (repository === void 0) {
+				repository = keys;
+				keys = null;
+			}
+
+			var _repo = repository;
+			if (!repository || (typeof repository !== 'string' && repository.constructor.prototype !== eko.Repository.prototype)) {
+				log.ERROR('entityArray', 'Unknown argument value: repository', repository);
+			}
+
 			options = options || {};
 			options.async = false;
-			return ko.computed({
+			options.attach = options.attach != false;
+
+			var _value = null;
+			var impl = ko.computed({
 				deferEvaluation: true,
 				read: function () {
-					if (!_repo) {
-						if (typeof repository === 'string') {
-							_repo = eko.repositories.get(repository);
-						} else if (repository.constructor.prototype === eko.Repository.prototype) {
-							_repo = repository;
-						}
-						if (!_repo) {
-							log.ERROR('entity', 'Unknown repository for relationship: ' + repository);
-						}
+					if (_value) {
+						return _value;
 					}
 
 					var key = '';
@@ -182,9 +189,31 @@ var DefaultOptions = {
 						key = _unwrap(keys);
 					}
 
-					return _repo.Get(key, options);
+					impl.repository();
+					_value = _repo.Get(key, options);
+					return _value;
+				},
+
+				write: function (value) {
+					impl.repository();
+					if (options.attach) {
+						_value = _repo.Attach(value);
+					} else {
+						_value = _repo.CreateNew(value);
+					}
+					impl.notifySubscribers();
 				}
-			})
+			});
+			impl.repository = function () {
+				if (typeof _repo === 'string') {
+					_repo = eko.repositories.get(repository);
+					if (!_repo) {
+						log.ERROR('entityArray', 'Unknown named repository: ' + repository);
+					}
+				}
+				return _repo;
+			};
+			return impl;
 		},
 
 		/**
@@ -206,7 +235,6 @@ var DefaultOptions = {
 					return _array;
 				},
 				write: function (vals) {
-					impl.valueWillMutate();
 					impl.repository();
 					if (options.attach) {
 						_array = _repo.Attach(vals);
@@ -216,7 +244,7 @@ var DefaultOptions = {
 							_array.push(_repo.CreateNew(vals[i]));
 						}
 					}
-					impl.valueHasMutated();
+					impl.notifySubscribers();
 				}
 			});
 			impl.repository = function () {
