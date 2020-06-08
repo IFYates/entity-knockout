@@ -482,6 +482,8 @@ var DefaultOptions = {
 			Save: def.action.Save || eko.options.actionSave
 		};
 
+		repo.Keys = function () { return def.keys; };
+		repo.Fields = function () { return def.fields; };
 		repo.ModelName = function () { return def.name; };
 
 		repo.Content = ko.observableArray([]);
